@@ -22,6 +22,8 @@ final class AppModel {
     var updates: [ModelUpdate] = []
     var dismissedUpdates: Set<String> = []
     var summaries: [ChatSummary] = []
+    /// Sidebar folders, sorted by name.
+    var groups: [ChatGroup] = []
     var currentId: String?
     var current: Chat?
     var connectors: [ConnectorConfig] = []
@@ -78,6 +80,7 @@ final class AppModel {
         installed = saved.filter { Catalog.model($0.id) != nil && FileManager.default.fileExists(atPath: Paths.models.appendingPathComponent($0.fileName).path) }
         persistInstalled()
         summaries = store.summaries
+        groups = store.groups
         skills = Skills.list()
         memories = MemoryStore.load()
         connectors = JSONFile.read([ConnectorConfig].self, from: Paths.connectors) ?? []
@@ -406,6 +409,7 @@ final class AppModel {
 
     private func refreshSummaries() {
         summaries = store.summaries
+        if groups != store.groups { groups = store.groups }
     }
 
     func renameChat(_ id: String, _ title: String) {
@@ -432,6 +436,51 @@ final class AppModel {
         store.deleteAll()
         newChat()
         refreshSummaries()
+    }
+
+    // MARK: Folders (ChatGroup)
+
+    /// Creates a sidebar folder and, from a chat's menu, files that chat in it.
+    func createGroup(_ name: String, moving chatId: String? = nil) {
+        let clean = ChatGroup.cleanName(name)
+        guard let group = store.createGroup(clean.isEmpty ? "New folder" : clean) else { return }
+        if let chatId { store.move(chatId, to: group.id) }
+        refreshFolders()
+    }
+
+    func renameGroup(_ id: String, _ name: String) {
+        store.renameGroup(id, name)
+        refreshFolders()
+    }
+
+    /// Deletes only the folder; its chats move back to the chat list.
+    func deleteGroup(_ id: String) {
+        store.deleteGroup(id)
+        refreshFolders()
+    }
+
+    func setGroupCollapsed(_ id: String, _ collapsed: Bool) {
+        store.setGroupCollapsed(id, collapsed)
+        if groups != store.groups { groups = store.groups }
+    }
+
+    /// nil takes the chat out of its folder.
+    func moveChat(_ chatId: String, to groupId: String?) {
+        if store.move(chatId, to: groupId) { refreshFolders() }
+    }
+
+    /// Drop handler for chats dragged onto a folder. False when none of them could move.
+    func moveChats(_ chatIds: [String], to groupId: String) -> Bool {
+        var moved = false
+        for id in chatIds where store.move(id, to: groupId) { moved = true }
+        if moved { refreshFolders() }
+        return moved
+    }
+
+    /// Folder changes edit chats in the store directly, so the open chat picks up its new folder too.
+    private func refreshFolders() {
+        refreshSummaries()
+        if let id = currentId, let chat = store.chats[id], chat.groupId != current?.groupId { current = chat }
     }
 
     func shareFolder() {
@@ -948,7 +997,7 @@ final class AppModel {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let chats = Array(store.chats.values)
         do {
-            try Backup.export(to: url, chats: chats, settings: settings, connectors: connectors, memories: memories)
+            try Backup.export(to: url, chats: chats, groups: store.groups, settings: settings, connectors: connectors, memories: memories)
             showToast("Saved a backup of \(chats.filter { !$0.messages.isEmpty }.count) chats.")
         } catch {
             showToast("Couldn’t save the backup: \(error.localizedDescription)", error: true)
@@ -973,6 +1022,7 @@ final class AppModel {
                 store.save(chat)
                 result.chats += 1
             }
+            store.importGroups(contents.groups, replace: replace)
             if var s = contents.settings {
                 s.onboarded = settings.onboarded
                 s.activeTier = settings.activeTier
