@@ -27,7 +27,8 @@
       "top_k": 20,
       "min_p": 0,
       "presence_penalty": 1.5
-    }
+    },
+    "visionPath": "mmproj-F16.gguf"
   },
   {
     "id": "qwen3.5-4b",
@@ -57,7 +58,8 @@
       "top_k": 20,
       "min_p": 0,
       "presence_penalty": 1.5
-    }
+    },
+    "visionPath": "mmproj-F16.gguf"
   },
   {
     "id": "qwen3.5-9b",
@@ -87,7 +89,8 @@
       "top_k": 20,
       "min_p": 0,
       "presence_penalty": 1.5
-    }
+    },
+    "visionPath": "mmproj-F16.gguf"
   },
   {
     "id": "qwen3.6-35b-a3b",
@@ -117,6 +120,70 @@
       "top_k": 20,
       "min_p": 0,
       "presence_penalty": 1.5
-    }
+    },
+    "visionPath": "mmproj-F16.gguf"
+  },
+  {
+    "id": "qwen3.6-35b-a3b-compact",
+    "name": "Qwen3.6 35B-A3B (UD-IQ3_XXS, 3-bit)",
+    "params": "35B",
+    "totalParamsB": 35,
+    "activeParamsB": 3,
+    "quality": 78,
+    "repo": "unsloth/Qwen3.6-35B-A3B-GGUF",
+    "path": "Qwen3.6-35B-A3B-UD-IQ3_XXS.gguf",
+    "kvBytesPerToken": 10880,
+    "overheadBytes": 500000000,
+    "maxContext": 262144,
+    "thinking": "optional",
+    "license": "Apache 2.0",
+    "licenseUrl": "https://www.apache.org/licenses/LICENSE-2.0",
+    "sampling": {
+      "temperature": 0.7,
+      "top_p": 0.8,
+      "top_k": 20,
+      "min_p": 0,
+      "presence_penalty": 1.5
+    },
+    "thinkingSampling": {
+      "temperature": 1.0,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0,
+      "presence_penalty": 1.5
+    },
+    "visionPath": "mmproj-F16.gguf"
+  },
+  {
+    "id": "qwen3.8-27b",
+    "name": "Qwen3.8 27B (UD-Q4_K_M)",
+    "params": "27B",
+    "totalParamsB": 27,
+    "activeParamsB": 27,
+    "quality": 90,
+    "repo": "unsloth/Qwen3.8-27B-GGUF",
+    "path": "Qwen3.8-27B-UD-Q4_K_M.gguf",
+    "kvBytesPerToken": 34816,
+    "overheadBytes": 600000000,
+    "maxContext": 262144,
+    "thinking": "optional",
+    "license": "Apache 2.0",
+    "licenseUrl": "https://www.apache.org/licenses/LICENSE-2.0",
+    "sampling": {
+      "temperature": 0.7,
+      "top_p": 0.8,
+      "top_k": 20,
+      "min_p": 0,
+      "presence_penalty": 1.5
+    },
+    "thinkingSampling": {
+      "temperature": 1.0,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0,
+      "presence_penalty": 1.5
+    },
+    "reasoningEffort": "medium",
+    "visionPath": "mmproj-F16.gguf"
   }
 ]

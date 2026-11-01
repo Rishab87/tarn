@@ -13,7 +13,7 @@ struct ModelPickTests {
     }
 
     @Test func catalogLoads() {
-        #expect(Catalog.all.count == 4)
+        #expect(Catalog.all.count == 6)
         #expect(Catalog.all.allSatisfy { $0.file.sha256.count == 64 && $0.file.size > 0 })
     }
 
@@ -42,10 +42,42 @@ struct ModelPickTests {
         #expect(p.recommended?.model.id == "qwen3.5-9b")
     }
 
-    @Test func thirtyTwoGigGetsTheBigMoE() {
+    @Test func thirtyTwoGigProGetsTheFastMoE() {
+        // M3 Pro: the dense 27B would crawl (~6 tokens/s), so the 3B-active MoE wins.
         let p = picks(ram: 32, ws: 0.78, bw: 150)
         #expect(p.recommended?.model.id == "qwen3.6-35b-a3b")
         #expect(p.lighter?.model.id == "qwen3.5-9b")
+    }
+
+    @Test func m5ProStaysOnTheMoE() {
+        let p = picks(ram: 36, ws: 0.78, bw: 307)
+        #expect(p.recommended?.model.id == "qwen3.6-35b-a3b")
+    }
+
+    @Test func maxChipsGetTheSmartestModel() {
+        let m4max = picks(ram: 32, ws: 0.78, bw: 546)
+        #expect(m4max.recommended?.model.id == "qwen3.8-27b")
+        #expect(m4max.lighter?.model.id == "qwen3.5-9b")
+        let m5max = picks(ram: 64, ws: 0.8, bw: 614)
+        #expect(m5max.recommended?.model.id == "qwen3.8-27b")
+    }
+
+    @Test func mostCapableOption() {
+        // 16 GB: the 3-bit 35B fits in RAM (tight), so it's offered rather than paging the 4-bit one.
+        let m5 = picks(ram: 16, ws: 0.74, bw: 153)
+        #expect(m5.bigger?.model.id == "qwen3.6-35b-a3b-compact")
+        #expect(ModelFit.biggerWarning(m5.bigger!, ramBytes: 16 * GiB, budgetBytes: m5.budgetBytes).contains("Other apps may slow down"))
+        // 24 GB M4 Pro: the full 4-bit 35B fits and is fast.
+        #expect(picks(ram: 24, ws: 0.74, bw: 273).bigger?.model.id == "qwen3.6-35b-a3b")
+        // 8 GB: the 9B fits in RAM, just not comfortably.
+        let m1 = picks(ram: 8, ws: 0.67, bw: 68)
+        #expect(m1.bigger?.model.id == "qwen3.5-9b")
+        // M3 Pro 32 GB: the dense 27B is smarter but slow there.
+        let pro = picks(ram: 32, ws: 0.78, bw: 150)
+        #expect(pro.bigger?.model.id == "qwen3.8-27b")
+        #expect(ModelFit.biggerWarning(pro.bigger!, ramBytes: 32 * GiB, budgetBytes: pro.budgetBytes).contains("words a second"))
+        // Max chips already get the strongest model: no "Most capable" option.
+        #expect(picks(ram: 32, ws: 0.78, bw: 546).bigger == nil)
     }
 
     @Test func tooLittleMemory() {
@@ -289,5 +321,59 @@ struct MiscTests {
 
     @Test func splitsCommands() {
         #expect(splitArgs(#"npx -y "@scope/server name" '/a b'"#) == ["npx", "-y", "@scope/server name", "/a b"])
+    }
+}
+
+@Suite("Memory")
+struct MemoryTests {
+    @Test func keepsFactsButNeverSecrets() {
+        #expect(MemoryStore.normalize("Lives in Pune and is vegetarian.") == "Lives in Pune and is vegetarian.")
+        #expect(MemoryStore.normalize("My card is 4111 1111 1111 1111") == nil)
+        #expect(MemoryStore.normalize("wifi password is hunter2") == nil)
+        #expect(MemoryStore.normalize("  ") == nil)
+    }
+
+    @Test func dedupesAndForgets() {
+        var items = MemoryStore.adding("Name is Sam.", to: []).items
+        let again = MemoryStore.adding("name is sam", to: items)
+        #expect(!again.added)
+        items = MemoryStore.adding("Works as a nurse in Pune.", to: items).items
+        #expect(items.first?.text == "Works as a nurse in Pune.")
+        let r = MemoryStore.removing(matching: "nurse", from: items)
+        #expect(r.removed == 1 && r.items.count == 1)
+        #expect(MemoryStore.promptSection(items)?.contains("- Name is Sam.") == true)
+    }
+
+    @Test func searchesPastChats() {
+        var a = Chat(id: "a1", title: "Goa trip", createdAt: Date(), updatedAt: Date())
+        a.messages = [Message(id: "m", role: .user, createdAt: Date(), text: "Book a beach shack in Goa for December")]
+        var b = Chat(id: "b1", title: "Tax", createdAt: Date(), updatedAt: Date())
+        b.messages = [Message(id: "n", role: .user, createdAt: Date(), text: "File my taxes")]
+        let out = PastChats.search("goa beach", in: [a, b], excluding: "b1")
+        #expect(out.contains("Goa trip"))
+        #expect(!out.contains("Tax"))
+        #expect(PastChats.search("goa", in: [a], excluding: "a1") == "No earlier chats mention that.")
+    }
+}
+
+@Suite("Images")
+struct ImageTests {
+    @Test func recentImagesSentAsPixelsOlderAsNotes() {
+        func msg(_ id: String, image: Bool) -> Message {
+            Message(id: id, role: .user, createdAt: Date(), text: "look",
+                    attachments: image ? [Attachment(id: "i\(id)", name: "\(id).png", kind: .image, size: 1, text: "", file: "i\(id).jpg")] : nil)
+        }
+        let msgs = [msg("1", image: true), msg("2", image: true), msg("3", image: true)]
+        let h = Prompt.history(msgs, imageDataURL: { _ in "data:image/jpeg;base64,AAAA" })
+        #expect(h[0]["content"] is String)
+        #expect((h[0]["content"] as? String)?.contains("[An image was attached here: 1.png]") == true)
+        #expect((h[2]["content"] as? [[String: Any]])?.contains { $0["type"] as? String == "image_url" } == true)
+        #expect(Prompt.needsVision(msgs))
+        #expect(!Prompt.needsVision([msg("4", image: false)]))
+        #expect(Prompt.estimateTokens(h) > 2000)
+    }
+
+    @Test func everyModelHasVision() {
+        #expect(Catalog.all.allSatisfy { $0.vision?.sha256.count == 64 })
     }
 }

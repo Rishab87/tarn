@@ -21,6 +21,8 @@ enum Paths {
         return dir("models")
     }
     static var skills: URL { dir("skills") }
+    /// Images attached to chats, downscaled to JPEG.
+    static var attachments: URL { dir("attachments") }
     static var logs: URL { dir("logs") }
     static var settings: URL { data.appendingPathComponent("settings.json") }
     static var modelsState: URL { data.appendingPathComponent("models.json") }

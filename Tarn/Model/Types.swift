@@ -3,20 +3,28 @@ import Foundation
 // MARK: - Settings
 
 enum Tier: String, Codable, CaseIterable, Identifiable {
-    case recommended, lighter
+    case recommended, lighter, bigger
     var id: String { rawValue }
-    var name: String { self == .recommended ? "Recommended" : "Lighter" }
+    var name: String {
+        switch self {
+        case .recommended: "Recommended"
+        case .lighter: "Lighter"
+        case .bigger: "Most capable"
+        }
+    }
     var blurb: String {
-        self == .recommended
-            ? "The best fit for your Mac. Smart, and fast enough to use while you browse."
-            : "Quicker and lighter on memory. Good for days with heavy apps open."
+        switch self {
+        case .recommended: "The best fit for your Mac. Smart, and fast enough to use while you browse."
+        case .lighter: "Quicker and lighter on memory. Good for days with heavy apps open."
+        case .bigger: "Smarter, but asks more of your Mac than is comfortable. Best with nothing else open."
+        }
     }
 }
 
 enum ThemeChoice: String, Codable, CaseIterable, Identifiable {
     case system, light, dark
     var id: String { rawValue }
-    var label: String { self == .system ? "Match Mac" : self == .light ? "Light" : "Dark" }
+    var label: String { self == .system ? "System" : self == .light ? "Light" : "Dark" }
 }
 
 struct WaterStats: Codable, Equatable {
@@ -38,6 +46,8 @@ struct AppSettings: Codable, Equatable {
     /// Unload the model after this many idle minutes. 0 = never.
     var idleUnloadMinutes = 15
     var memoryGuard = true
+    /// Remember facts about the user across chats (stored only on this Mac).
+    var memoryEnabled = true
     var water = WaterStats()
 
     init() {}
@@ -56,6 +66,7 @@ struct AppSettings: Codable, Equatable {
         let idle = (try? c.decode(Int.self, forKey: .idleUnloadMinutes)) ?? d.idleUnloadMinutes
         idleUnloadMinutes = [0, 5, 15, 30, 60].contains(idle) ? idle : d.idleUnloadMinutes
         memoryGuard = (try? c.decode(Bool.self, forKey: .memoryGuard)) ?? d.memoryGuard
+        memoryEnabled = (try? c.decode(Bool.self, forKey: .memoryEnabled)) ?? d.memoryEnabled
         var w = (try? c.decode(WaterStats.self, forKey: .water)) ?? d.water
         if w.answers < 0 || !w.ml.isFinite || w.ml < 0 { w = WaterStats() }
         water = w
@@ -125,6 +136,12 @@ struct CatalogModel: Codable, Equatable, Identifiable {
     let licenseUrl: String
     let sampling: Sampling
     let thinkingSampling: Sampling?
+    /// Sent with thinking on, for models whose template supports it (Qwen3.8 defaults to "xhigh").
+    let reasoningEffort: String?
+    /// Vision projector (mmproj) that lets the model read images. Downloaded after the model.
+    let vision: ModelFile?
+
+    var visionURL: URL? { vision.map { URL(string: "https://huggingface.co/\($0.repo)/resolve/\($0.revision)/\($0.path)")! } }
 
     var downloadURL: URL { URL(string: "https://huggingface.co/\(file.repo)/resolve/\(file.revision)/\(file.path)")! }
     /// Moving URL used to notice upstream fixes to the same file.
@@ -142,13 +159,22 @@ struct ModelPick: Equatable {
 struct Picks: Equatable {
     var recommended: ModelPick?
     var lighter: ModelPick?
+    /// A stronger model than this Mac comfortably runs, offered at the user's own risk.
+    var bigger: ModelPick? = nil
     var budgetBytes: Int64
 
-    func pick(_ tier: Tier) -> ModelPick? { tier == .recommended ? recommended : lighter }
+    func pick(_ tier: Tier) -> ModelPick? {
+        switch tier {
+        case .recommended: recommended
+        case .lighter: lighter
+        case .bigger: bigger
+        }
+    }
     func tier(of modelId: String?) -> Tier? {
         guard let modelId else { return nil }
         if recommended?.model.id == modelId { return .recommended }
         if lighter?.model.id == modelId { return .lighter }
+        if bigger?.model.id == modelId { return .bigger }
         return nil
     }
 }
@@ -159,6 +185,7 @@ struct InstalledModel: Codable, Equatable {
     var sha256: String
     var size: Int64
     var installedAt: Date
+    var visionFileName: String? = nil
 }
 
 struct DownloadProgress: Equatable {
@@ -167,6 +194,8 @@ struct DownloadProgress: Equatable {
     var total: Int64
     var bytesPerSec: Double
     var isUpdate: Bool
+    /// The image add-on (vision projector) rather than the model itself.
+    var isVision = false
     var fraction: Double { total > 0 ? min(1, Double(received) / Double(total)) : 0 }
 }
 
@@ -175,13 +204,21 @@ enum DownloadState: Equatable {
     case downloading(DownloadProgress)
     case paused(DownloadProgress)
     case verifying(DownloadProgress)
-    case failed(modelId: String, message: String)
+    case failed(modelId: String, message: String, isVision: Bool = false)
 
     var modelId: String? {
         switch self {
         case .idle: nil
         case .downloading(let p), .paused(let p), .verifying(let p): p.modelId
-        case .failed(let id, _): id
+        case .failed(let id, _, _): id
+        }
+    }
+    /// True for the image add-on download, which runs in the background after the model.
+    var isVision: Bool {
+        switch self {
+        case .idle: false
+        case .downloading(let p), .paused(let p), .verifying(let p): p.isVision
+        case .failed(_, _, let v): v
         }
     }
     var progress: DownloadProgress? {
@@ -221,14 +258,22 @@ enum EngineState: Equatable {
 // MARK: - Chats
 
 struct Attachment: Codable, Equatable, Identifiable, Hashable {
-    enum Kind: String, Codable { case text, pdf }
+    enum Kind: String, Codable { case text, pdf, image }
     var id: String
     var name: String
     var kind: Kind
     var size: Int64
-    /// Extracted text the model reads.
+    /// Extracted text the model reads (empty for images).
     var text: String
     var truncated: Bool = false
+    /// For images: file name inside the attachments folder (a downscaled JPEG).
+    var file: String? = nil
+}
+
+struct MemoryItem: Codable, Equatable, Identifiable {
+    var id: String
+    var text: String
+    var createdAt: Date
 }
 
 enum ToolStatus: String, Codable { case running, awaitingApproval = "awaiting-approval", done, error, denied }
@@ -359,6 +404,25 @@ struct ConnectorConfig: Codable, Equatable, Identifiable {
     var url: String = ""
     var headers: [String: String] = [:]
     var enabled: Bool
+
+    init(id: String, name: String, kind: Kind, command: String = "", args: [String] = [], env: [String: String] = [:],
+         url: String = "", headers: [String: String] = [:], enabled: Bool) {
+        self.id = id; self.name = name; self.kind = kind; self.command = command; self.args = args
+        self.env = env; self.url = url; self.headers = headers; self.enabled = enabled
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        kind = try c.decode(Kind.self, forKey: .kind)
+        command = try c.decodeIfPresent(String.self, forKey: .command) ?? ""
+        args = try c.decodeIfPresent([String].self, forKey: .args) ?? []
+        env = try c.decodeIfPresent([String: String].self, forKey: .env) ?? [:]
+        url = try c.decodeIfPresent(String.self, forKey: .url) ?? ""
+        headers = try c.decodeIfPresent([String: String].self, forKey: .headers) ?? [:]
+        enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+    }
 }
 
 struct ConnectorStatus: Equatable {

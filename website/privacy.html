@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en" data-theme="system">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy · Tarn</title>
+  <meta name="description" content="What Tarn sends over the internet, and what it never does.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="/assets/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script>try { var t = localStorage.getItem('tarn-theme'); if (t) document.documentElement.dataset.theme = t } catch (e) {}</script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/" aria-label="Tarn home">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 19 L11 8.5 L15.5 14 L19.5 9.5 L29 19" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 23.5 C10 21.2 22 21.2 26 23.5 C22 27 10 27 6 23.5 Z" fill="currentColor"/></svg>
+      Tarn
+    </a>
+    <div class="top-actions">
+      <button class="theme" type="button" aria-label="Appearance: System" title="Appearance">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></svg>
+        <span class="theme-label">System</span>
+      </button>
+    </div>
+  </header>
+  <main>
+    <article class="page">
+      <h1>Privacy</h1>
+      <p>Last updated 1 November 2026.</p>
+      <p>Tarn runs its AI on your Mac. It has no account, collects no analytics and shows no ads. Your chats, the files you attach or share, and your settings are stored only on your Mac, in ~/Library/Application Support/Tarn.</p>
+      <h2>What Tarn connects to</h2>
+      <ul>
+        <li><strong>Hugging Face</strong>, to download the AI model the first time, and to check once per launch whether an improved version of that file exists. Hugging Face sees your IP address, as with any download.</li>
+        <li><strong>DuckDuckGo</strong>, when web search is on and the AI decides to search. The search words go to DuckDuckGo; your conversation does not. Pages the AI opens are fetched directly from those websites.</li>
+        <li><strong>Update checks</strong>, in released versions with automatic updates, to look for a new version of Tarn.</li>
+        <li><strong>Connectors you add yourself</strong>, which receive only what you approve for each action.</li>
+      </ul>
+      <h2>This website</h2>
+      <p>The site is hosted on Vercel, which keeps standard server logs. It uses no cookies, trackers or analytics. Your appearance choice is saved in your browser’s local storage.</p>
+      <h2>Questions</h2>
+      <p>Open an issue on <a href="https://github.com/Rishab87/tarn/issues">GitHub</a>.</p>
+    </article>
+  </main>
+  <footer class="foot">
+    <p><a href="/">Back to Tarn</a></p>
+  </footer>
+  <script src="/script.js"></script>
+</body>
+</html>

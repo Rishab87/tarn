@@ -32,10 +32,16 @@ def main() -> None:
         f = next((x for x in tree if x["path"] == e["path"]), None)
         if not f or not f.get("lfs"):
             raise SystemExit(f"{e['repo']}/{e['path']} not found at {revision}")
-        entry = {k: v for k, v in e.items() if k not in ("repo", "path", "revision")}
+        entry = {k: v for k, v in e.items() if k not in ("repo", "path", "revision", "visionPath")}
         entry["file"] = {"repo": e["repo"], "path": e["path"], "revision": revision, "size": f["lfs"]["size"], "sha256": f["lfs"]["oid"]}
+        if e.get("visionPath"):
+            v = next((x for x in tree if x["path"] == e["visionPath"]), None)
+            if not v or not v.get("lfs"):
+                raise SystemExit(f"{e['repo']}/{e['visionPath']} not found at {revision}")
+            entry["vision"] = {"repo": e["repo"], "path": e["visionPath"], "revision": revision, "size": v["lfs"]["size"], "sha256": v["lfs"]["oid"]}
         out.append(entry)
-        print(f"{e['id']:<22} {f['lfs']['size'] / 1e9:6.2f} GB  {revision[:8]}  {f['lfs']['oid'][:12]}")
+        vis = f" + vision {entry['vision']['size'] / 1e9:.2f} GB" if "vision" in entry else ""
+        print(f"{e['id']:<22} {f['lfs']['size'] / 1e9:6.2f} GB{vis}  {revision[:8]}  {f['lfs']['oid'][:12]}")
     dest = ROOT / "Tarn" / "Resources" / "catalog.json"
     dest.write_text(json.dumps(out, indent=2) + "\n")
     print(f"Wrote {len(out)} models to {dest.relative_to(ROOT)}")

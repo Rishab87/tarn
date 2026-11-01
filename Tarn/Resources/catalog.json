@@ -32,6 +32,13 @@
       "revision": "f6d5376be1edb4d416d56da11e5397a961aca8ae",
       "size": 1280835840,
       "sha256": "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223"
+    },
+    "vision": {
+      "repo": "unsloth/Qwen3.5-2B-GGUF",
+      "path": "mmproj-F16.gguf",
+      "revision": "f6d5376be1edb4d416d56da11e5397a961aca8ae",
+      "size": 668227264,
+      "sha256": "7035e9cb8d7c6a9681d07eef9a364783e86ea4cd73faab2eabb4f43a101830c7"
     }
   },
   {
@@ -67,6 +74,13 @@
       "revision": "e87f176479d0855a907a41277aca2f8ee7a09523",
       "size": 2740937888,
       "sha256": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4"
+    },
+    "vision": {
+      "repo": "unsloth/Qwen3.5-4B-GGUF",
+      "path": "mmproj-F16.gguf",
+      "revision": "e87f176479d0855a907a41277aca2f8ee7a09523",
+      "size": 672423616,
+      "sha256": "cd88edcf8d031894960bb0c9c5b9b7e1fea6ebee02b9f7ce925a00d12891f864"
     }
   },
   {
@@ -102,6 +116,13 @@
       "revision": "3885219b6810b007914f3a7950a8d1b469d598a5",
       "size": 5680522464,
       "sha256": "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8"
+    },
+    "vision": {
+      "repo": "unsloth/Qwen3.5-9B-GGUF",
+      "path": "mmproj-F16.gguf",
+      "revision": "3885219b6810b007914f3a7950a8d1b469d598a5",
+      "size": 918166080,
+      "sha256": "f70dc3509053962b0d0d3ee8a7eacebf5d60aa560cad78254ae8698516ae029f"
     }
   },
   {
@@ -137,6 +158,98 @@
       "revision": "a483e9e6cbd595906af30beda3187c2663a1118c",
       "size": 17730509792,
       "sha256": "649d7508507b84638732c4f52c24c8b15843c6dca2f3ff793ae07c14a67ebbb3"
+    },
+    "vision": {
+      "repo": "unsloth/Qwen3.6-35B-A3B-GGUF",
+      "path": "mmproj-F16.gguf",
+      "revision": "a483e9e6cbd595906af30beda3187c2663a1118c",
+      "size": 899283680,
+      "sha256": "8971ee4f331ff0a4c609374f32984b3d4e6dc086c0aa35f1d637fad1829e887f"
+    }
+  },
+  {
+    "id": "qwen3.6-35b-a3b-compact",
+    "name": "Qwen3.6 35B-A3B (UD-IQ3_XXS, 3-bit)",
+    "params": "35B",
+    "totalParamsB": 35,
+    "activeParamsB": 3,
+    "quality": 78,
+    "kvBytesPerToken": 10880,
+    "overheadBytes": 500000000,
+    "maxContext": 262144,
+    "thinking": "optional",
+    "license": "Apache 2.0",
+    "licenseUrl": "https://www.apache.org/licenses/LICENSE-2.0",
+    "sampling": {
+      "temperature": 0.7,
+      "top_p": 0.8,
+      "top_k": 20,
+      "min_p": 0,
+      "presence_penalty": 1.5
+    },
+    "thinkingSampling": {
+      "temperature": 1.0,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0,
+      "presence_penalty": 1.5
+    },
+    "file": {
+      "repo": "unsloth/Qwen3.6-35B-A3B-GGUF",
+      "path": "Qwen3.6-35B-A3B-UD-IQ3_XXS.gguf",
+      "revision": "a483e9e6cbd595906af30beda3187c2663a1118c",
+      "size": 13211155424,
+      "sha256": "9c964e657212fea1f24905dd7b0a89b82fd807d19fab0b41da14251b07b88fbe"
+    },
+    "vision": {
+      "repo": "unsloth/Qwen3.6-35B-A3B-GGUF",
+      "path": "mmproj-F16.gguf",
+      "revision": "a483e9e6cbd595906af30beda3187c2663a1118c",
+      "size": 899283680,
+      "sha256": "8971ee4f331ff0a4c609374f32984b3d4e6dc086c0aa35f1d637fad1829e887f"
+    }
+  },
+  {
+    "id": "qwen3.8-27b",
+    "name": "Qwen3.8 27B (UD-Q4_K_M)",
+    "params": "27B",
+    "totalParamsB": 27,
+    "activeParamsB": 27,
+    "quality": 90,
+    "kvBytesPerToken": 34816,
+    "overheadBytes": 600000000,
+    "maxContext": 262144,
+    "thinking": "optional",
+    "license": "Apache 2.0",
+    "licenseUrl": "https://www.apache.org/licenses/LICENSE-2.0",
+    "sampling": {
+      "temperature": 0.7,
+      "top_p": 0.8,
+      "top_k": 20,
+      "min_p": 0,
+      "presence_penalty": 1.5
+    },
+    "thinkingSampling": {
+      "temperature": 1.0,
+      "top_p": 0.95,
+      "top_k": 20,
+      "min_p": 0,
+      "presence_penalty": 1.5
+    },
+    "reasoningEffort": "medium",
+    "file": {
+      "repo": "unsloth/Qwen3.8-27B-GGUF",
+      "path": "Qwen3.8-27B-UD-Q4_K_M.gguf",
+      "revision": "4ca720788d1e01f1bff70c033e0d0028fd02e502",
+      "size": 16464440224,
+      "sha256": "322e194ff79741c7baa497c240f677f54b201b0efab44ca8e50f122b39123482"
+    },
+    "vision": {
+      "repo": "unsloth/Qwen3.8-27B-GGUF",
+      "path": "mmproj-F16.gguf",
+      "revision": "4ca720788d1e01f1bff70c033e0d0028fd02e502",
+      "size": 927607488,
+      "sha256": "cbb841a9ee0636b2ec172f5bb8df2ea8dfeb01e90fe7c6126581d662a0b4e43e"
     }
   }
 ]

@@ -63,8 +63,26 @@ private struct UserMessageView: View {
     var body: some View {
         VStack(alignment: .trailing, spacing: 4) {
             if let files = message.attachments, !files.isEmpty {
-                HStack(spacing: 6) {
-                    ForEach(files) { f in FileChip(name: f.name) }
+                let images = files.filter { $0.kind == .image }
+                if !images.isEmpty {
+                    HStack(spacing: 8) {
+                        ForEach(images) { img in
+                            if let url = Attachments.imageURL(img), let ns = NSImage(contentsOf: url) {
+                                Image(nsImage: ns)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: images.count == 1 ? 260 : 150, height: images.count == 1 ? 180 : 110)
+                                    .clipShape(.rect(cornerRadius: 14))
+                                    .accessibilityLabel(img.name)
+                            }
+                        }
+                    }
+                }
+                let others = files.filter { $0.kind != .image }
+                if !others.isEmpty {
+                    HStack(spacing: 6) {
+                        ForEach(others) { f in FileChip(attachment: f) }
+                    }
                 }
             }
             if editing {
@@ -81,7 +99,7 @@ private struct UserMessageView: View {
                             editing = false
                             model.editAndResend(chat.id, messageId: message.id, text: draft.trimmingCharacters(in: .whitespacesAndNewlines))
                         }
-                        .buttonStyle(.glassProminent).tint(.primary)
+                        .primaryButton()
                         .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }
@@ -299,7 +317,7 @@ private struct ApprovalCard: View {
                 Button("Don’t allow") { model.approve(blockId, .deny) }.buttonStyle(.borderless)
                 Button("Allow for this chat") { model.approve(blockId, .chat) }.buttonStyle(.glass)
                 Button("Allow once") { model.approve(blockId, .once) }
-                    .buttonStyle(.glassProminent).tint(.primary)
+                    .primaryButton()
                     .keyboardShortcut(.defaultAction)
             }
         }
@@ -312,16 +330,20 @@ private struct ApprovalCard: View {
 }
 
 struct FileChip: View {
-    let name: String
+    let attachment: Attachment
     var onRemove: (() -> Void)? = nil
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "doc.text").font(.caption)
-            Text(name).lineLimit(1).truncationMode(.middle).font(.callout)
+            if attachment.kind == .image, let url = Attachments.imageURL(attachment), let ns = NSImage(contentsOf: url) {
+                Image(nsImage: ns).resizable().scaledToFill().frame(width: 22, height: 22).clipShape(.rect(cornerRadius: 5))
+            } else {
+                Image(systemName: attachment.kind == .pdf ? "doc.richtext" : "doc.text").font(.caption)
+            }
+            Text(attachment.name).lineLimit(1).truncationMode(.middle).font(.callout)
             if let onRemove {
                 Button(action: onRemove) { Image(systemName: "xmark").font(.caption2.weight(.bold)) }
                     .buttonStyle(.borderless)
-                    .accessibilityLabel("Remove \(name)")
+                    .accessibilityLabel("Remove \(attachment.name)")
             }
         }
         .padding(.horizontal, 10)

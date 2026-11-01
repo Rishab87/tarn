@@ -4,7 +4,7 @@ import Foundation
 enum Prompt {
     static let charsPerToken = 3.2
 
-    static func system(chat: Chat, settings: AppSettings, toolNames: Set<String>, skills: [Skill], now: Date = Date()) -> String {
+    static func system(chat: Chat, settings: AppSettings, toolNames: Set<String>, skills: [Skill], memories: [MemoryItem] = [], now: Date = Date()) -> String {
         let date = now.formatted(.dateTime.weekday(.wide).month(.wide).day().year())
         let time = now.formatted(.dateTime.hour().minute())
         var lines = [
@@ -15,6 +15,10 @@ enum Prompt {
         ]
         let about = settings.aboutYou.trimmingCharacters(in: .whitespacesAndNewlines)
         if !about.isEmpty { lines.append("\nWhat the user wants you to know about them:\n\(about)") }
+        if settings.memoryEnabled, let section = MemoryStore.promptSection(memories) { lines.append("\n" + section) }
+        if toolNames.contains("remember") {
+            lines.append("\nWhen the user tells you something about themselves that would help in future chats (name, work, location, preferences, ongoing plans), save it with remember, without asking. If they ask you to forget something, use forget. If they mention an earlier conversation, use search_past_chats.")
+        }
         if toolNames.contains("web_search") {
             lines.append("\nYou can search the web. Do it for anything recent, local or changeable (news, prices, weather, opening hours, sports) and for facts you are unsure of. Mention the websites you used as Markdown links.")
         }
@@ -33,7 +37,7 @@ enum Prompt {
 
     static func userContent(_ m: Message, attachmentChars: Int) -> String {
         var text = m.text
-        let files = m.attachments ?? []
+        let files = (m.attachments ?? []).filter { $0.kind != .image }
         guard !files.isEmpty else { return text }
         let per = attachmentChars / files.count
         for a in files {
@@ -46,14 +50,37 @@ enum Prompt {
         return text
     }
 
+    /// Indexes of the user messages whose images are sent as pixels (the two most recent).
+    static func imageMessageIndexes(_ messages: [Message], keep: Int = 2) -> Set<Int> {
+        let idx = messages.indices.filter { messages[$0].role == .user && (messages[$0].attachments ?? []).contains { $0.kind == .image } }
+        return Set(idx.suffix(keep))
+    }
+
+    /// True when the prompt will include images, so the engine needs its vision add-on.
+    static func needsVision(_ messages: [Message]) -> Bool { !imageMessageIndexes(messages).isEmpty }
+
     /// Converts the transcript to chat-completion messages. Thinking is never sent back.
     /// Tool results older than the last `keepFull` messages are shortened to save room.
-    static func history(_ messages: [Message], keepFull: Int = 2, attachmentChars: Int = 60_000) -> [[String: Any]] {
+    static func history(_ messages: [Message], keepFull: Int = 2, attachmentChars: Int = 60_000,
+                        imageDataURL: (Attachment) -> String? = Attachments.dataURL) -> [[String: Any]] {
         var out: [[String: Any]] = []
         let fullFrom = max(0, messages.count - keepFull)
+        let withPixels = imageMessageIndexes(messages)
         for (i, m) in messages.enumerated() {
             if m.role == .user {
-                out.append(["role": "user", "content": userContent(m, attachmentChars: attachmentChars)])
+                let text = userContent(m, attachmentChars: attachmentChars)
+                let images = (m.attachments ?? []).filter { $0.kind == .image }
+                if images.isEmpty {
+                    out.append(["role": "user", "content": text])
+                } else if withPixels.contains(i) {
+                    var parts: [[String: Any]] = [["type": "text", "text": text.isEmpty ? "Here is an image." : text]]
+                    for img in images {
+                        if let url = imageDataURL(img) { parts.append(["type": "image_url", "image_url": ["url": url]]) }
+                    }
+                    out.append(["role": "user", "content": parts])
+                } else {
+                    out.append(["role": "user", "content": text + images.map { "\n[An image was attached here: \($0.name)]" }.joined()])
+                }
                 continue
             }
             var text = ""
@@ -88,10 +115,14 @@ enum Prompt {
         return out
     }
 
+    /// Rough token count. Images cost about 1,400 tokens each at 1024 px.
     static func estimateTokens(_ msgs: [[String: Any]]) -> Int {
         var chars = 0
         for m in msgs {
             chars += (m["content"] as? String)?.count ?? 0
+            for part in m["content"] as? [[String: Any]] ?? [] {
+                if part["type"] as? String == "image_url" { chars += Int(1400 * charsPerToken) } else { chars += (part["text"] as? String)?.count ?? 0 }
+            }
             if let calls = m["tool_calls"], let d = try? JSONSerialization.data(withJSONObject: calls) { chars += d.count }
         }
         return Int((Double(chars) / charsPerToken).rounded(.up))

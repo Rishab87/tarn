@@ -67,6 +67,16 @@ final class Downloader: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     }
 
     func run(maxRetries: Int = 8) async throws {
+        // A complete file may already be here (app data reset, restored backup): verify and keep it.
+        if let existing = try? FileManager.default.attributesOfItem(atPath: dest.path)[.size] as? Int64, existing == expectedSize {
+            onVerifying()
+            let digest = try await Task.detached(priority: .utility) { [dest] in try Self.sha256(of: dest) }.value
+            if digest == expectedSHA256 {
+                session.finishTasksAndInvalidate()
+                return
+            }
+            try? FileManager.default.removeItem(at: dest)
+        }
         var attempt = 0
         while true {
             if isCancelled { throw DownloadError(kind: .cancelled, message: "Download paused") }

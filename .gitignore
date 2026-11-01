@@ -8,3 +8,10 @@ Engine/llama/
 *.xcworkspace/xcuserdata/
 scripts/dev/winid
 .secrets/
+website/download/
+website/.vercel/
+.vercel/
+video/*.wav
+video/beats.json
+video/footage/
+video/out/

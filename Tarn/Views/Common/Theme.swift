@@ -21,6 +21,47 @@ extension Color {
     static let sceneFar = Color(light: 0xDCE0DD, dark: 0x2D3536)
     static let sceneNear = Color(light: 0xC5CCC9, dark: 0x3B4647)
     static let warning = Color(light: 0x8A5A0B, dark: 0xE2B25A)
+    /// Primary buttons: near-black in light mode, near-white in dark mode, with readable labels.
+    static let ink = Color(light: 0x161616, dark: 0xF2F2EF)
+    static let onInk = Color(light: 0xFFFFFF, dark: 0x111111)
+    static let sceneBasin = Color(light: 0xB7C0BD, dark: 0x323D3E)
+}
+
+/// The one prominent action on a screen: an ink capsule that stays readable in light and dark
+/// mode and in inactive windows (system prominent buttons turn grey there).
+struct PrimaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var enabled
+    @Environment(\.controlSize) private var size
+
+    func makeBody(configuration: Configuration) -> some View {
+        let large = size == .large || size == .extraLarge
+        configuration.label
+            .font(.system(size: large ? 15 : 13, weight: .semibold))
+            .foregroundStyle(Color.onInk)
+            .padding(.horizontal, large ? 22 : 14)
+            .padding(.vertical, large ? 11 : 6)
+            .background(Color.ink.opacity(enabled ? (configuration.isPressed ? 0.78 : 1) : 0.3), in: .capsule)
+            .contentShape(.capsule)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
+/// Round send/stop button for the composer.
+struct SendButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var enabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(enabled ? Color.onInk : Color.secondary)
+            .frame(width: 32, height: 32)
+            .background(enabled ? Color.ink.opacity(configuration.isPressed ? 0.78 : 1) : Color.secondary.opacity(0.18), in: .circle)
+            .contentShape(.circle)
+    }
+}
+
+extension View {
+    func primaryButton() -> some View { buttonStyle(PrimaryButtonStyle()) }
 }
 
 extension Font {
@@ -83,6 +124,9 @@ struct TarnScene: View {
             basin.addCurve(to: p(350, 150), control1: p(290, 204), control2: p(330, 182))
             basin.closeSubpath()
 
+            // The bowl is stone-coloured, so a half-full lake looks like water rising in rock.
+            ctx.fill(basin, with: .color(.sceneBasin))
+
             let l = min(1, max(0, level))
             let surface = 196 - l * 46
             ctx.drawLayer { layer in
@@ -104,6 +148,14 @@ struct TarnScene: View {
             ctx.stroke(rim, with: .color(.secondary.opacity(0.6)), lineWidth: 1.2 * sx)
         }
         .aspectRatio(420 / 230, contentMode: .fit)
+        // Fade the sides and bottom so the landscape dissolves into the window.
+        .mask {
+            LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.14),
+                                   .init(color: .black, location: 0.86), .init(color: .clear, location: 1)],
+                           startPoint: .leading, endPoint: .trailing)
+                .mask(LinearGradient(stops: [.init(color: .black, location: 0.9), .init(color: .clear, location: 1)],
+                                     startPoint: .top, endPoint: .bottom))
+        }
         .animation(.easeInOut(duration: 0.6), value: level)
         .accessibilityLabel("Lake \(Int(level * 100)) percent full")
     }

@@ -35,6 +35,7 @@
 		85BEB2E81EA24919A3274B78 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C2CA2940C18B5C15C74D194 /* SettingsView.swift */; };
 		88D52E66765CD17C5D43DB5E /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C089F592A6B602FBDD05BAD /* AppModel.swift */; };
 		A0C88C470207775A0356C2E8 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF5AFD6D96B13351952D34C5 /* Theme.swift */; };
+		A19F2B6A47F7545B86CE9CAE /* Memory.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8D04A7808A406D066038A31 /* Memory.swift */; };
 		B049D57D5337A93EB777C936 /* libggml.0.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 3507629422FBB758556C33EB /* libggml.0.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		B3928B457EA47D010CB2C69E /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC594F473B45FD9DE1DBB961 /* OnboardingView.swift */; };
 		BBC0945437BB9EB0115F953B /* Engine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C38CED4ED88E809AC509ED73 /* Engine.swift */; };
@@ -129,6 +130,7 @@
 		CCA39734377624A9522D9D09 /* TarnTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TarnTests.swift; sourceTree = "<group>"; };
 		CE8220DD4C4F5B7F430F118E /* WebTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebTools.swift; sourceTree = "<group>"; };
 		CF5AFD6D96B13351952D34C5 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		D8D04A7808A406D066038A31 /* Memory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Memory.swift; sourceTree = "<group>"; };
 		E973F4B3B78706B835E122D8 /* Backup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backup.swift; sourceTree = "<group>"; };
 		EBF8BC24B9AEDD82BCCC30D7 /* Types.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Types.swift; sourceTree = "<group>"; };
 		F1CF41AC0A111DDA49218A3F /* libggml-cpu.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = "libggml-cpu.0.dylib"; sourceTree = "<group>"; };
@@ -250,6 +252,7 @@
 				63878171FF66490C86FF3392 /* HardwareInfo.swift */,
 				037EBE2822261A00B49EE34E /* LLM.swift */,
 				0773AC9886C5E1AF7D6FE5BE /* MCP.swift */,
+				D8D04A7808A406D066038A31 /* Memory.swift */,
 				80E7DC45B8CB281C3F84B8B6 /* Skills.swift */,
 				A558329BFF628B22B7D555F5 /* Storage.swift */,
 				BC3E805940EBD44C5F50F4A8 /* System.swift */,
@@ -446,6 +449,7 @@
 				EC88683D4AC5BC0EAC799FC0 /* LLM.swift in Sources */,
 				4D3D181A6E6D3ED6D2EB8218 /* MCP.swift in Sources */,
 				5F699E854F99760DB67B7A1D /* MainView.swift in Sources */,
+				A19F2B6A47F7545B86CE9CAE /* Memory.swift in Sources */,
 				B3928B457EA47D010CB2C69E /* OnboardingView.swift in Sources */,
 				46FBF9AAF784601A63A19489 /* Prompt.swift in Sources */,
 				85BEB2E81EA24919A3274B78 /* SettingsView.swift in Sources */,
@@ -515,7 +519,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -583,7 +587,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

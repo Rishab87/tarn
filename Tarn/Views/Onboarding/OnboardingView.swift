@@ -2,19 +2,20 @@ import SwiftUI
 
 struct OnboardingView: View {
     @Environment(AppModel.self) private var model
-    @State private var step = 0
 
     var body: some View {
         ZStack {
-            switch step {
-            case 0: Welcome { withAnimation(.smooth) { step = 1 } }
-            case 1: Origin { withAnimation(.smooth) { step = 2 } }
+            switch model.onboardingStep {
+            case 0: Welcome { withAnimation(.smooth) { model.onboardingStep = 1 } }
+            case 1: Origin { withAnimation(.smooth) { model.onboardingStep = 2 } }
             default: Setup()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(40)
         .transition(.opacity)
+        .toolbar(removing: .title)
+        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
     }
 }
 
@@ -34,8 +35,7 @@ private struct Welcome: View {
                 .frame(maxWidth: 460)
                 .padding(.bottom, 32)
             Button(action: next) { Text("Get started").frame(minWidth: 120) }
-                .buttonStyle(.glassProminent)
-                .tint(.primary)
+                .primaryButton()
                 .controlSize(.extraLarge)
                 .keyboardShortcut(.defaultAction)
         }
@@ -102,7 +102,7 @@ private struct Setup: View {
         let hw = model.hardware
         let chosen = model.picks.pick(tier)
         let ready = model.isInstalled(chosen?.model.id)
-        let mine = model.download.modelId == chosen?.model.id ? model.download : .idle
+        let mine = model.download.modelId == chosen?.model.id && !model.download.isVision ? model.download : .idle
         let level = ready ? 1 : (mine.progress?.fraction ?? 0)
 
         VStack(spacing: 0) {
@@ -121,7 +121,10 @@ private struct Setup: View {
                 GlassEffectContainer(spacing: 10) {
                     VStack(spacing: 10) {
                         ForEach(Tier.allCases) { t in
-                            if let pick = model.picks.pick(t) { TierRow(tier: t, pick: pick, selected: tier == t) { choose(t) } }
+                            if let pick = model.picks.pick(t) {
+                                TierRow(tier: t, pick: pick, selected: tier == t,
+                                        warning: t == .bigger ? ModelFit.biggerWarning(pick, ramBytes: hw?.ramBytes ?? 0, budgetBytes: model.picks.budgetBytes) : nil) { choose(t) }
+                            }
                         }
                     }
                 }
@@ -138,8 +141,7 @@ private struct Setup: View {
                         Button("Try again") { model.startDownload(id) }.buttonStyle(.glass).controlSize(.extraLarge)
                     }
                     Button { model.finishOnboarding() } label: { Text(ready ? "Start chatting" : "Continue to Tarn").frame(minWidth: 150) }
-                        .buttonStyle(.glassProminent)
-                        .tint(.primary)
+                        .primaryButton()
                         .controlSize(.extraLarge)
                         .keyboardShortcut(.defaultAction)
                 }
@@ -188,7 +190,7 @@ private struct Setup: View {
             case _ where ready:
                 Text("Downloaded and checked.").font(.headline)
                 Text("Everything from here on runs on your Mac.").foregroundStyle(.secondary)
-            case .failed(_, let message):
+            case .failed(_, let message, _):
                 Text("The download stopped").font(.headline)
                 Text(message).foregroundStyle(.secondary).multilineTextAlignment(.center)
             case .verifying:
@@ -214,6 +216,7 @@ private struct TierRow: View {
     let tier: Tier
     let pick: ModelPick
     let selected: Bool
+    var warning: String? = nil
     let action: () -> Void
 
     var body: some View {
@@ -225,6 +228,13 @@ private struct TierRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(Fmt.tierLabel(tier, pick)).font(.headline)
                     Text(tier.blurb).foregroundStyle(.secondary)
+                    if let warning {
+                        Label(warning, systemImage: "exclamationmark.triangle.fill")
+                            .font(.callout)
+                            .foregroundStyle(Color.warning)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 2)
+                    }
                 }
                 Spacer()
                 Text(Fmt.bytes(pick.model.file.size)).foregroundStyle(.secondary).monospacedDigit()

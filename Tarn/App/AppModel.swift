@@ -27,10 +27,15 @@ final class AppModel {
     var connectors: [ConnectorConfig] = []
     var connectorStatus: [String: ConnectorStatus] = [:]
     var skills: [Skill] = []
+    var memories: [MemoryItem] = []
     var memoryAlert: MemoryAlert?
     var toast: Toast?
     var drafts: [String: String] = [:]
     var searchOpen = false
+    var onboardingStep = 0
+    var settingsTab = "general"
+    /// Bumped to ask the root view to open the Settings window.
+    var openSettingsRequest = 0
     var sidebarVisible = NavigationSplitViewVisibility.all
 
     // MARK: Services
@@ -56,7 +61,15 @@ final class AppModel {
         guard !booted else { return }
         settings = JSONFile.read(AppSettings.self, from: Paths.settings) ?? AppSettings()
         applyTheme()
-        let hw = await HardwareInfo.detect()
+        var hw = await HardwareInfo.detect()
+        #if DEBUG
+        // Test hook: -TarnSimulateRAMGB 8 makes model picks behave like a Mac with that much memory.
+        let simGB = UserDefaults.standard.integer(forKey: "TarnSimulateRAMGB")
+        if simGB > 0 {
+            hw.ramBytes = Int64(simGB) << 30
+            hw.gpuWorkingSetBytes = Int64(Double(hw.ramBytes) * 0.67)
+        }
+        #endif
         hardware = hw
         picks = ModelFit.picks(ramBytes: hw.ramBytes, gpuWorkingSetBytes: hw.gpuWorkingSetBytes, bandwidthGBs: hw.bandwidthGBs)
         let saved = JSONFile.read([InstalledModel].self, from: Paths.modelsState) ?? []
@@ -64,6 +77,7 @@ final class AppModel {
         persistInstalled()
         summaries = store.summaries
         skills = Skills.list()
+        memories = MemoryStore.load()
         connectors = JSONFile.read([ConnectorConfig].self, from: Paths.connectors) ?? []
         engine.onChange = { [weak self] s in self?.engineState = s }
         memory.onPressure = { [weak self] critical in self?.handlePressure(critical: critical) }
@@ -76,6 +90,7 @@ final class AppModel {
             Task { await checkModelUpdates() }
             // Load the model in the background so the first answer doesn't wait for it.
             if activeModelId != nil { Task { try? await ensureEngine() } }
+            ensureVisionAddOn()
         }
         #if DEBUG
         debugAutomation()
@@ -124,8 +139,9 @@ final class AppModel {
     var activeModelId: String? {
         let tier = settings.activeTier
         if let id = picks.pick(tier)?.model.id, isInstalled(id) { return id }
-        let other: Tier = tier == .recommended ? .lighter : .recommended
-        if let id = picks.pick(other)?.model.id, isInstalled(id) { return id }
+        for other in [Tier.recommended, .lighter, .bigger] where other != tier {
+            if let id = picks.pick(other)?.model.id, isInstalled(id) { return id }
+        }
         return installed.first?.id
     }
 
@@ -134,7 +150,13 @@ final class AppModel {
     func isInstalled(_ id: String?) -> Bool { installed.contains { $0.id == id } }
 
     func contextFor(_ id: String) -> Int {
-        [picks.recommended, picks.lighter].compactMap { $0 }.first { $0.model.id == id }?.contextTokens ?? 8192
+        [picks.recommended, picks.lighter, picks.bigger].compactMap { $0 }.first { $0.model.id == id }?.contextTokens ?? 8192
+    }
+
+    /// Models larger than the memory budget let llama.cpp decide how many layers fit on the GPU.
+    func needsFit(_ id: String) -> Bool {
+        guard let p = [picks.recommended, picks.lighter, picks.bigger].compactMap({ $0 }).first(where: { $0.model.id == id }) else { return false }
+        return p.footprintBytes > picks.budgetBytes
     }
 
     private func persistInstalled() {
@@ -142,13 +164,36 @@ final class AppModel {
     }
 
     @discardableResult
-    func ensureEngine() async throws -> String {
+    func ensureEngine(needVision: Bool = false) async throws -> String {
         guard let id = activeModelId, let m = installed.first(where: { $0.id == id }) else {
             throw ToolFailure("Tarn is still setting up its AI. Chat unlocks when the download finishes.")
         }
+        var vision: URL?
+        if needVision {
+            guard let file = m.visionFileName else { throw ToolFailure(visionMissingMessage(id)) }
+            vision = Paths.models.appendingPathComponent(file)
+        } else if let cur = engine.currentConfig, cur.modelId == id, cur.visionPath != nil {
+            vision = cur.visionPath // already loaded: keep it rather than restarting
+        }
         try await engine.ensure(Engine.Config(modelId: id, modelPath: Paths.models.appendingPathComponent(m.fileName),
-                                              contextTokens: contextFor(id), idleSeconds: settings.idleUnloadMinutes * 60))
+                                              contextTokens: contextFor(id), idleSeconds: settings.idleUnloadMinutes * 60, visionPath: vision,
+                                              fitToDevice: needsFit(id)))
         return id
+    }
+
+    private func visionMissingMessage(_ id: String) -> String {
+        if download.modelId == id, download.isVision, let p = download.progress {
+            return "Tarn is still downloading its image add-on (\(Int(p.fraction * 100))%). Send the image again when it finishes."
+        }
+        startDownload(id, vision: true)
+        return "Tarn needs a small add-on to see images. It’s downloading now; send the image again when it finishes."
+    }
+
+    /// Fetches the image add-on for the active model in the background, if it's missing.
+    func ensureVisionAddOn() {
+        guard let id = activeModelId, let m = installed.first(where: { $0.id == id }), m.visionFileName == nil,
+              Catalog.model(id)?.vision != nil, download == .idle else { return }
+        startDownload(id, vision: true)
     }
 
     func setTier(_ tier: Tier) {
@@ -157,24 +202,25 @@ final class AppModel {
         if activeModelId != nil { Task { try? await ensureEngine() } }
     }
 
-    func startDownload(_ modelId: String, isUpdate: Bool = false) {
+    func startDownload(_ modelId: String, isUpdate: Bool = false, vision: Bool = false) {
         guard let model = Catalog.model(modelId) else { return }
-        if let current = download.modelId, current == modelId, case .downloading = download { return }
+        if download.modelId == modelId, download.isVision == vision, case .downloading = download { return }
         if case .downloading = download { pauseDownload() }
-        let update = isUpdate ? updates.first { $0.modelId == modelId && $0.kind == .file } : nil
-        let size = update?.sizeBytes ?? model.file.size
-        let sha = update?.sha256 ?? model.file.sha256
-        let url = update == nil ? model.downloadURL : model.latestURL
-        let fileName = "\(model.id)\(update == nil ? "" : ".update").gguf"
+        let update = isUpdate && !vision ? updates.first { $0.modelId == modelId && $0.kind == .file } : nil
+        if vision && model.vision == nil { return }
+        let size = vision ? model.vision!.size : (update?.sizeBytes ?? model.file.size)
+        let sha = vision ? model.vision!.sha256 : (update?.sha256 ?? model.file.sha256)
+        let url = vision ? model.visionURL! : (update == nil ? model.downloadURL : model.latestURL)
+        let fileName = vision ? "\(model.id).mmproj.gguf" : "\(model.id)\(update == nil ? "" : ".update").gguf"
         let dest = Paths.models.appendingPathComponent(fileName)
         let part = dest.appendingPathExtension("part")
         let have = (try? FileManager.default.attributesOfItem(atPath: part.path)[.size] as? Int64) ?? 0
         let needed = size - have + 500_000_000
         if HardwareInfo.freeDiskBytes() < needed {
-            download = .failed(modelId: modelId, message: "Tarn needs \(Fmt.bytes(needed)) of free space for this download. Free up some space and try again.")
+            download = .failed(modelId: modelId, message: "Tarn needs \(Fmt.bytes(needed)) of free space for this download. Free up some space and try again.", isVision: vision)
             return
         }
-        let base = DownloadProgress(modelId: modelId, received: have, total: size, bytesPerSec: 0, isUpdate: update != nil)
+        let base = DownloadProgress(modelId: modelId, received: have, total: size, bytesPerSec: 0, isUpdate: update != nil, isVision: vision)
         download = .downloading(base)
         let d = Downloader(url: url, dest: dest, expectedSize: size, expectedSHA256: sha, onProgress: { [weak self] p in
             Task { @MainActor in
@@ -197,12 +243,23 @@ final class AppModel {
             defer { ProcessInfo.processInfo.endActivity(activity) }
             do {
                 try await d.run()
-                await finishInstall(model, fileName: fileName, sha: sha, size: size, isUpdate: update != nil)
-                download = .idle
+                if vision {
+                    if let i = installed.firstIndex(where: { $0.id == model.id }) {
+                        installed[i].visionFileName = fileName
+                        persistInstalled()
+                    }
+                    download = .idle
+                } else {
+                    await finishInstall(model, fileName: fileName, sha: sha, size: size, isUpdate: update != nil)
+                    download = .idle
+                    ensureVisionAddOn()
+                }
             } catch let e as DownloadError where e.kind == .cancelled {
-                if let p = download.progress, p.modelId == modelId { download = .paused(DownloadProgress(modelId: modelId, received: p.received, total: p.total, bytesPerSec: 0, isUpdate: p.isUpdate)) }
+                if let p = download.progress, p.modelId == modelId {
+                    download = .paused(DownloadProgress(modelId: modelId, received: p.received, total: p.total, bytesPerSec: 0, isUpdate: p.isUpdate, isVision: p.isVision))
+                }
             } catch {
-                download = .failed(modelId: modelId, message: error.localizedDescription)
+                download = .failed(modelId: modelId, message: error.localizedDescription, isVision: vision)
             }
             if downloader === d { downloader = nil }
         }
@@ -240,7 +297,7 @@ final class AppModel {
         downloader = nil
         download = .idle
         if let id {
-            for suffix in [".gguf.part", ".update.gguf.part"] {
+            for suffix in [".gguf.part", ".update.gguf.part", ".mmproj.gguf.part"] {
                 try? FileManager.default.removeItem(at: Paths.models.appendingPathComponent(id + suffix))
             }
         }
@@ -250,6 +307,7 @@ final class AppModel {
         guard let m = installed.first(where: { $0.id == id }) else { return }
         if engineState.modelId == id { Task { await engine.stop() } }
         try? FileManager.default.removeItem(at: Paths.models.appendingPathComponent(m.fileName))
+        if let v = m.visionFileName { try? FileManager.default.removeItem(at: Paths.models.appendingPathComponent(v)) }
         installed.removeAll { $0.id == id }
         persistInstalled()
     }
@@ -288,9 +346,16 @@ final class AppModel {
 
     private func handlePressure(critical: Bool) {
         guard settings.memoryGuard, case .ready(let id, _) = engineState, !engine.likelyAsleep, Date() > memoryQuietUntil, memoryAlert == nil else { return }
-        // Only speak up if pressure is still there a few seconds later.
+        // Speak up only for sustained pressure (~45 s) or a critical spike, not brief blips.
         Task {
-            try? await Task.sleep(for: .seconds(8))
+            if !critical {
+                for _ in 0..<3 {
+                    try? await Task.sleep(for: .seconds(15))
+                    guard MemoryWatcher.level() >= 2 else { return }
+                }
+            } else {
+                try? await Task.sleep(for: .seconds(3))
+            }
             guard MemoryWatcher.level() >= 2, memoryAlert == nil else { return }
             let pick = [picks.recommended, picks.lighter].compactMap { $0 }.first { $0.model.id == id }
             memoryAlert = MemoryAlert(critical: critical || MemoryWatcher.level() >= 4, onLighter: picks.lighter == nil || picks.lighter?.model.id == id,
@@ -467,6 +532,16 @@ final class AppModel {
         if settings.webSearch { tools += [WebSearchTool(), FetchPageTool()] }
         if chat.folder != nil { tools += [ListFilesTool(), ReadFileTool(), SearchFilesTool(), WriteFileTool(), EditFileTool(), RunCommandTool()] }
         if !Skills.enabled().isEmpty { tools.append(UseSkillTool()) }
+        if settings.memoryEnabled {
+            tools.append(RememberTool(save: { [weak self] fact in await self?.rememberFact(fact) ?? "Memory is unavailable." }))
+            tools.append(ForgetTool(forget: { [weak self] what in await self?.forgetFacts(what) ?? "Memory is unavailable." }))
+            tools.append(SearchPastChatsTool(search: { [weak self] query, chatId in
+                await MainActor.run {
+                    guard let self else { return "Chat history is unavailable." }
+                    return PastChats.search(query, in: Array(self.store.chats.values), excluding: chatId)
+                }
+            }))
+        }
         for c in connectors where c.enabled {
             guard let conn = connections[c.id] else { continue }
             tools += conn.tools.map { ConnectorTool(connection: conn, toolName: $0.name, toolDescription: $0.description, toolSchema: $0.schema) }
@@ -491,7 +566,8 @@ final class AppModel {
         var genMs = 0.0
         let started = Date()
         do {
-            let modelId = try await ensureEngine()
+            let needVision = Prompt.needsVision(store.chats[chatId]?.messages ?? [])
+            let modelId = try await ensureEngine(needVision: needVision)
             try Task.checkCancellation()
             setMessage(chatId, messageId) { $0.modelId = modelId }
             let model = Catalog.model(modelId)
@@ -507,7 +583,7 @@ final class AppModel {
                 let toolsLen = (try? JSONSerialization.data(withJSONObject: defs).count) ?? 0
                 let past = chat.messages.filter { !($0.id == messageId && $0.blocks.isEmpty) }
                 let history = Prompt.history(past, keepFull: 2, attachmentChars: Int(Double(ctx) * Prompt.charsPerToken * 0.45))
-                let system = Prompt.system(chat: chat, settings: settings, toolNames: Set(tools.map(\.name)), skills: Skills.enabled())
+                let system = Prompt.system(chat: chat, settings: settings, toolNames: Set(tools.map(\.name)), skills: Skills.enabled(), memories: memories)
                 var messages = Prompt.fit(system: system, history: history, toolsJSONLength: toolsLen, budget: ctx - maxOutput - 256)
 
                 var calls: [Int: (id: String, name: String, args: String)] = [:]
@@ -526,7 +602,11 @@ final class AppModel {
                         body["min_p"] = s.min_p
                         if let p = s.presence_penalty { body["presence_penalty"] = p }
                     }
-                    if model?.thinking == .optional { body["chat_template_kwargs"] = ["enable_thinking": thinking] }
+                    if model?.thinking == .optional {
+                        var kwargs: [String: Any] = ["enable_thinking": thinking]
+                        if thinking, let effort = model?.reasoningEffort { kwargs["reasoning_effort"] = effort }
+                        body["chat_template_kwargs"] = kwargs
+                    }
                     engine.markActive()
                     do {
                         try await streamRound(chatId: chatId, messageId: messageId, body: body, calls: &calls, tokens: &tokens, genMs: &genMs)
@@ -665,7 +745,14 @@ final class AppModel {
             block.status = .awaitingApproval
             block.approval = request
             save(block)
-            let decision: ApprovalDecision = await withCheckedContinuation { c in
+            #if DEBUG
+            // Scripted test runs (-TarnAutoApprove YES) approve after a short pause so the card is visible.
+            let auto = UserDefaults.standard.bool(forKey: "TarnAutoApprove")
+            if auto { try? await Task.sleep(for: .seconds(1)) }
+            #else
+            let auto = false
+            #endif
+            let decision: ApprovalDecision = auto ? .once : await withCheckedContinuation { c in
                 if Task.isCancelled { c.resume(returning: .deny) } else { approvals[blockId] = (chatId, c) }
             }
             block.approval = nil
@@ -771,6 +858,36 @@ final class AppModel {
         showToast(added > 0 ? "Added \(added) connector\(added == 1 ? "" : "s") from Claude Desktop." : "No new connectors found in Claude Desktop.")
     }
 
+    // MARK: Memory
+
+    func rememberFact(_ raw: String) -> String {
+        guard settings.memoryEnabled else { return "Memory is switched off in Settings." }
+        guard let fact = MemoryStore.normalize(raw) else { return "Not saved: memories can’t contain passwords, card numbers or other secrets." }
+        let r = MemoryStore.adding(fact, to: memories)
+        guard r.added else { return "Already remembered." }
+        memories = r.items
+        MemoryStore.save(memories)
+        return "Saved to memory."
+    }
+
+    func forgetFacts(_ what: String) -> String {
+        let r = MemoryStore.removing(matching: what, from: memories)
+        guard r.removed > 0 else { return "No saved memory matched “\(what)”." }
+        memories = r.items
+        MemoryStore.save(memories)
+        return "Forgot \(r.removed) memor\(r.removed == 1 ? "y" : "ies")."
+    }
+
+    func deleteMemory(_ id: String) {
+        memories.removeAll { $0.id == id }
+        MemoryStore.save(memories)
+    }
+
+    func clearMemories() {
+        memories = []
+        MemoryStore.save(memories)
+    }
+
     // MARK: Skills
 
     func refreshSkills() { skills = Skills.list() }
@@ -786,7 +903,7 @@ final class AppModel {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let chats = Array(store.chats.values)
         do {
-            try Backup.export(to: url, chats: chats, settings: settings, connectors: connectors)
+            try Backup.export(to: url, chats: chats, settings: settings, connectors: connectors, memories: memories)
             showToast("Saved a backup of \(chats.filter { !$0.messages.isEmpty }.count) chats.")
         } catch {
             showToast("Couldn’t save the backup: \(error.localizedDescription)", error: true)
@@ -823,6 +940,13 @@ final class AppModel {
                 applyTheme()
             }
             result.skills = Backup.restoreSkills(contents.skillFiles)
+            var merged = replace ? [] : memories
+            for m in contents.memories.reversed() { merged = MemoryStore.adding(m.text, to: merged).items }
+            memories = merged
+            MemoryStore.save(memories)
+            for a in contents.attachmentFiles {
+                try? a.data.write(to: Paths.attachments.appendingPathComponent(a.name))
+            }
             // Connectors arrive switched off, so a crafted backup can't start programs on this Mac.
             for var c in contents.connectors where !connectors.contains(where: { $0.id == c.id || $0.name == c.name }) {
                 c.enabled = false
@@ -851,17 +975,198 @@ final class AppModel {
     }
 
     #if DEBUG
-    /// Test hook for scripted runs: `-TarnAutoSend "question"` sends once the model is ready.
+    /// Test hooks for scripted runs (Debug builds only):
+    ///   -TarnAutoSend "question" [-TarnAutoFolder /path]  sends one message once the model is ready.
+    ///   -TarnTour YES  walks every screen and asks scripts/dev/tour.sh to screenshot each one.
     private func debugAutomation() {
-        guard let text = UserDefaults.standard.string(forKey: "TarnAutoSend"), settings.onboarded else { return }
+        let d = UserDefaults.standard
+        if d.bool(forKey: "TarnTour") {
+            Task { await runTour() }
+            return
+        }
+        if let path = d.string(forKey: "TarnScript") {
+            Task { await runScript(path) }
+            return
+        }
+        guard let text = d.string(forKey: "TarnAutoSend"), settings.onboarded else { return }
         Task {
             try? await Task.sleep(for: .seconds(1))
-            if let folder = UserDefaults.standard.string(forKey: "TarnAutoFolder") {
+            if let folder = d.string(forKey: "TarnAutoFolder") {
                 let c = createChat()
                 mutate(c.id) { $0.folder = folder }
             }
             _ = send(text, attachments: [])
         }
+    }
+
+    private func tourLog(_ s: String) {
+        let url = Paths.data.appendingPathComponent("tour.log")
+        let line = Data("\(s)\n".utf8)
+        if let h = try? FileHandle(forWritingTo: url) {
+            _ = try? h.seekToEnd()
+            try? h.write(contentsOf: line)
+            try? h.close()
+        } else {
+            try? line.write(to: url)
+        }
+    }
+
+    /// Asks the harness for a screenshot and waits until it confirms.
+    private func shot(_ name: String, window: String = "main", settle: Double = 1.5) async {
+        try? await Task.sleep(for: .seconds(settle))
+        tourLog("SHOT \(name) \(window)")
+        let ack = Paths.data.appendingPathComponent("tour.ack")
+        for _ in 0..<150 {
+            if (try? String(contentsOf: ack, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) == name { return }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+    }
+
+    private func waitUntil(_ timeout: Double, _ condition: () -> Bool) async -> Bool {
+        let end = Date().addingTimeInterval(timeout)
+        while Date() < end {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(300))
+        }
+        return condition()
+    }
+
+    private func tourSend(_ text: String) async {
+        let ok = send(text, attachments: [])
+        tourLog("INFO sent=\(ok) \(text.prefix(48))")
+        try? await Task.sleep(for: .seconds(0.5))
+        _ = await waitUntil(600) { !isAnswering(currentId) }
+        if let m = current?.messages.last {
+            let tools = m.blocks.compactMap { if case .tool(let t) = $0 { "\(t.name):\(t.status.rawValue)" } else { nil } }
+            tourLog("INFO answer status=\(m.status?.rawValue ?? "?") tokens=\(m.tokens ?? 0) ms=\(m.ms ?? 0) tools=\(tools) error=\(m.error ?? "-")")
+        }
+    }
+
+    struct ScriptStep: Decodable {
+        var text: String
+        var setTier: String?
+        var waitForInstall: Bool?
+        var newChat: Bool?
+        var attach: [String]?
+        var folder: String?
+        var thinking: Bool?
+        var waitForVision: Bool?
+    }
+
+    /// Plays chat steps from a JSON file, logging each answer, then quits (tests the quit path too).
+    private func runScript(_ path: String) async {
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              let steps = try? JSONDecoder().decode([ScriptStep].self, from: data) else {
+            tourLog("ERROR bad script"); NSApp.terminate(nil); return
+        }
+        if activeModelId != nil { _ = await waitUntil(180) { if case .ready = engineState { true } else { false } } }
+        for (n, step) in steps.enumerated() {
+            if step.newChat ?? true { newChat() }
+            if let t = step.thinking { update { $0.thinking = t } }
+            if let raw = step.setTier, let tier = Tier(rawValue: raw) {
+                let target = picks.pick(tier)?.model.id
+                tourLog("INFO tier \(raw) -> \(target ?? "none")")
+                setTier(tier)
+                if step.waitForInstall == true {
+                    let t0 = Date()
+                    let ok = await waitUntil(1800) { isInstalled(target) && download.modelId != target }
+                    tourLog("INFO installed=\(ok) in \(Int(Date().timeIntervalSince(t0)))s state=\(download)")
+                    _ = await waitUntil(240) { if case .ready(let id, _) = engineState { id == target } else { false } }
+                    tourLog("INFO engine \(engineState) fit=\(engine.currentConfig?.fitToDevice ?? false)")
+                }
+            }
+            if step.waitForVision == true {
+                let ok = await waitUntil(900) { installed.first { $0.id == activeModelId }?.visionFileName != nil }
+                tourLog("INFO vision add-on ready=\(ok)")
+            }
+            if let folder = step.folder {
+                let c = createChat()
+                mutate(c.id) { $0.folder = folder }
+            }
+            let files = (step.attach ?? []).compactMap { try? Attachments.read(URL(fileURLWithPath: $0)) }
+            tourLog("STEP \(n + 1): \(step.text.prefix(60))")
+            _ = send(step.text, attachments: files)
+            try? await Task.sleep(for: .seconds(0.5))
+            _ = await waitUntil(900) { !isAnswering(currentId) }
+            if let m = current?.messages.last {
+                let tools = m.blocks.compactMap { if case .tool(let t) = $0 { "\(t.name):\(t.status.rawValue)" } else { nil } }
+                let thought = m.blocks.contains { if case .thinking = $0 { true } else { false } }
+                tourLog("ANSWER model=\(m.modelId ?? "-") status=\(m.status?.rawValue ?? "?") tools=\(tools) thinking=\(thought) error=\(m.error ?? "-")")
+                tourLog("TEXT \(m.visibleText.replacingOccurrences(of: "\n", with: " ").prefix(500))")
+            }
+        }
+        tourLog("MEMORIES \(memories.map(\.text))")
+        tourLog("DONE")
+        try? await Task.sleep(for: .seconds(1))
+        NSApp.terminate(nil)
+    }
+
+    private func runTour() async {
+        update { $0.theme = .light }
+        try? await Task.sleep(for: .seconds(1.5))
+        if !settings.onboarded {
+            await shot("01-welcome")
+            onboardingStep = 1
+            await shot("02-origin")
+            onboardingStep = 2
+            await shot("03-setup-start", settle: 5)
+            _ = await waitUntil(3600) { (download.progress?.fraction ?? 0) >= 0.4 || isInstalled(picks.recommended?.model.id) }
+            await shot("04-setup-downloading", settle: 0.3)
+            let ok = await waitUntil(3600) { isInstalled(picks.recommended?.model.id) }
+            tourLog("INFO download finished=\(ok) state=\(download)")
+            await shot("05-setup-ready")
+            finishOnboarding()
+        }
+        let ready = await waitUntil(180) { if case .ready = engineState { true } else { false } }
+        tourLog("INFO engine ready=\(ready) \(engineState)")
+        await shot("06-empty-light")
+        await tourSend("Plan a relaxed 3-day trip to Jaipur for two people, with a rough budget in rupees.")
+        await shot("07-chat-light")
+        await tourSend("What's the weather forecast for Delhi this weekend? Search the web.")
+        await shot("08-web-search")
+        if let imageChat = store.chats.values.first(where: { $0.messages.contains { ($0.attachments ?? []).contains { $0.kind == .image } } }) {
+            openChat(imageChat.id)
+            await shot("08b-image-chat")
+        }
+
+        let folder = Paths.data.appendingPathComponent("demo-folder", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try? Data("Trip: Jaipur, 3 days, 2 people, late November.\n".utf8).write(to: folder.appendingPathComponent("trip.txt"))
+        newChat()
+        let chat = createChat()
+        mutate(chat.id) { $0.folder = folder.path }
+        _ = send("Read trip.txt, then create a file called packing-list.md in this folder with a short packing list for that trip.", attachments: [])
+        let asked = await waitUntil(300) { !approvals.isEmpty }
+        tourLog("INFO approval shown=\(asked)")
+        await shot("09-approval")
+        for k in approvals.keys { approve(k, .once) }
+        _ = await waitUntil(300) { !isAnswering(currentId) }
+        tourLog("INFO packing-list written=\(FileManager.default.fileExists(atPath: folder.appendingPathComponent("packing-list.md").path))")
+        await shot("10-after-approval")
+
+        memoryAlert = MemoryAlert(critical: false, onLighter: false, engineGB: 6.8)
+        await shot("11-memory-alert")
+        memoryAlert = nil
+
+        if let first = summaries.last?.id { openChat(first) }
+        update { $0.theme = .dark }
+        await shot("12-chat-dark")
+        newChat()
+        await shot("13-empty-dark")
+
+        openSettingsRequest += 1
+        settingsTab = "general"
+        await shot("14-settings-general-dark", window: "settings")
+        settingsTab = "model"
+        await shot("15-settings-model-dark", window: "settings")
+        settingsTab = "memory"
+        await shot("15b-settings-memory-dark", window: "settings")
+        update { $0.theme = .light }
+        await shot("16-settings-model-light", window: "settings")
+        update { $0.theme = .system }
+        tourLog("DONE")
+        try? await Task.sleep(for: .seconds(1))
+        NSApp.terminate(nil)
     }
     #endif
 }

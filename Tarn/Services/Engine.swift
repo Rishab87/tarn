@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 /// Runs llama.cpp's llama-server as a child process bound to 127.0.0.1 on a random port and
@@ -9,6 +10,10 @@ final class Engine {
         var modelPath: URL
         var contextTokens: Int
         var idleSeconds: Int
+        /// Vision projector (mmproj); loaded only when a chat contains images.
+        var visionPath: URL? = nil
+        /// For models bigger than the memory budget: let llama.cpp fit layers to GPU memory.
+        var fitToDevice = false
     }
 
     private(set) var state: EngineState = .stopped {
@@ -18,6 +23,7 @@ final class Engine {
 
     private var process: Process?
     private var config: Config?
+    var currentConfig: Config? { config }
     private var starting: Task<Void, Error>?
     private(set) var port = 0
     private(set) var apiKey = ""
@@ -60,15 +66,17 @@ final class Engine {
         // A small zsh watchdog runs llama-server and kills it within a second if Tarn goes away
         // for any reason (crash, force quit), so the model's memory is never left behind.
         p.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        p.arguments = ["-f", "-c", Self.watchdog, "tarn-engine", bin.path] + [
+        var args: [String] = [
             "-m", cfg.modelPath.path,
             "--host", "127.0.0.1",
             "--port", String(port),
             "--api-key", apiKey,
             "-c", String(cfg.contextTokens),
             "-np", "1",
-            "-ngl", "all",
-            "--fit", "off",
+        ]
+        // Models over the memory budget let llama.cpp decide how many layers fit on the GPU.
+        args += cfg.fitToDevice ? ["--fit", "on"] : ["-ngl", "all", "--fit", "off"]
+        args += [
             "-fa", "auto",
             "-ctk", "q8_0",
             "-ctv", "q8_0",
@@ -80,6 +88,8 @@ final class Engine {
             "--cache-ram", String(ModelFit.promptCacheMiB),
             "--sleep-idle-seconds", cfg.idleSeconds > 0 ? String(cfg.idleSeconds) : "-1",
         ]
+        if let vision = cfg.visionPath { args += ["--mmproj", vision.path] }
+        p.arguments = ["-f", "-c", Self.watchdog, "tarn-engine", bin.path] + args
         let logURL = Paths.logs.appendingPathComponent("engine.log")
         FileManager.default.createFile(atPath: logURL.path, contents: nil)
         let log = try FileHandle(forWritingTo: logURL)
@@ -140,19 +150,35 @@ final class Engine {
             return
         }
         stopping = true
-        p.terminate()
-        for _ in 0..<50 where p.isRunning { try? await Task.sleep(for: .milliseconds(100)) }
-        if p.isRunning { kill(p.processIdentifier, SIGKILL) }
+        let wrapper = p.processIdentifier
+        let children = Self.childPIDs(of: wrapper)
+        p.terminate() // the watchdog forwards SIGTERM to llama-server
+        for _ in 0..<50 where p.isRunning || children.contains(where: { kill($0, 0) == 0 }) {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        for c in children where kill(c, 0) == 0 { kill(c, SIGKILL) }
+        if p.isRunning { kill(wrapper, SIGKILL) }
         process = nil
         try? FileManager.default.removeItem(at: Self.pidFile)
         state = .stopped
     }
 
-    /// Synchronous kill for app termination.
+    /// For app termination: must not block, and must not leave llama-server running.
     func killNow() {
         stopping = true
-        if let p = process, p.isRunning { kill(p.processIdentifier, SIGKILL) }
+        if let p = process, p.isRunning {
+            // Stop llama-server directly, then its watchdog. SIGKILL on the watchdog alone
+            // would orphan the engine.
+            for c in Self.childPIDs(of: p.processIdentifier) { kill(c, SIGTERM) }
+            kill(p.processIdentifier, SIGTERM)
+        }
         try? FileManager.default.removeItem(at: Self.pidFile)
+    }
+
+    static func childPIDs(of pid: pid_t) -> [pid_t] {
+        var buffer = [pid_t](repeating: 0, count: 64)
+        let n = proc_listchildpids(pid, &buffer, Int32(buffer.count * MemoryLayout<pid_t>.size))
+        return n > 0 ? Array(buffer.prefix(min(Int(n), buffer.count))).filter { $0 > 0 } : []
     }
 
     enum EngineError: Error { case missing, exited, timeout }

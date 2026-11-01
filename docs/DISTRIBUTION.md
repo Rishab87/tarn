@@ -2,7 +2,20 @@
 
 Verified 2026-11-01. Re-check prices before you rely on them.
 
-## Where the app lives
+## Current setup: website and download on Vercel (free Hobby plan)
+
+The landing page and `Tarn.dmg` (≈16 MB) are deployed together from `website/`.
+
+| Hobby limit | Value | What it means for Tarn |
+|---|---|---|
+| Fast Data Transfer | 100 GB per month | ≈6,000 downloads a month, counting ~16 MB per download plus page views |
+| Max upload per deployment (CLI) | 100 MB | Fine for a 16 MB DMG |
+| Use | Non-commercial only | OK while Tarn is free. Selling licenses requires Vercel Pro ($20/month) or moving hosting |
+| Over the limit | Sustained overage can pause the project; paused projects must be resumed by hand | Move the DMG to GitHub Releases before you get near 100 GB |
+
+AI models never count against this: the app downloads them from Hugging Face.
+
+## Where the app should live at scale
 
 | What | Where | Cost |
 |---|---|---|

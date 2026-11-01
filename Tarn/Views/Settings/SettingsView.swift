@@ -1,15 +1,19 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @Environment(AppModel.self) private var model
+
     var body: some View {
-        TabView {
-            Tab("General", systemImage: "slider.horizontal.3") { GeneralPane() }
-            Tab("AI Model", systemImage: "cpu") { ModelPane() }
-            Tab("Connectors", systemImage: "puzzlepiece.extension") { ConnectorsPane() }
-            Tab("Skills", systemImage: "sparkles") { SkillsPane() }
-            Tab("Chats & Backup", systemImage: "archivebox") { DataPane() }
-            Tab("Updates", systemImage: "arrow.triangle.2.circlepath") { UpdatesPane() }
-            Tab("About", systemImage: "info.circle") { AboutPane() }
+        @Bindable var model = model
+        TabView(selection: $model.settingsTab) {
+            Tab("General", systemImage: "slider.horizontal.3", value: "general") { GeneralPane() }
+            Tab("AI Model", systemImage: "cpu", value: "model") { ModelPane() }
+            Tab("Memory", systemImage: "brain.head.profile", value: "memory") { MemoryPane() }
+            Tab("Connectors", systemImage: "puzzlepiece.extension", value: "connectors") { ConnectorsPane() }
+            Tab("Skills", systemImage: "sparkles", value: "skills") { SkillsPane() }
+            Tab("Chats & Backup", systemImage: "archivebox", value: "data") { DataPane() }
+            Tab("Updates", systemImage: "arrow.triangle.2.circlepath", value: "updates") { UpdatesPane() }
+            Tab("About", systemImage: "info.circle", value: "about") { AboutPane() }
         }
         .frame(width: 640, height: 560)
     }
@@ -109,11 +113,19 @@ private struct TierCard: View {
     let pick: ModelPick
     @State private var confirmDelete = false
 
+    private var reclaimable: Int64 {
+        let m = pick.model
+        let hasVision = model.installed.first { $0.id == m.id }?.visionFileName != nil
+        return m.file.size + (hasVision ? (m.vision?.size ?? 0) : 0)
+    }
+
     var body: some View {
         let m = pick.model
         let installed = model.isInstalled(m.id)
         let active = model.activeModelId == m.id
-        let mine = model.download.modelId == m.id ? model.download : .idle
+        let mine = model.download.modelId == m.id && !model.download.isVision ? model.download : .idle
+        let visionDL = model.download.modelId == m.id && model.download.isVision ? model.download : .idle
+        let visionReady = model.installed.first(where: { $0.id == m.id })?.visionFileName != nil
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(Fmt.tierLabel(tier, pick)).font(.headline)
@@ -131,15 +143,43 @@ private struct TierCard: View {
                     if installed && !active { Button("Use this model") { model.setTier(tier) } }
                     if !installed { Button("Download · \(Fmt.bytes(m.file.size))") { model.startDownload(m.id) } }
                     if installed {
-                        Button("Delete…") { confirmDelete = true }
+                        Button("Remove from Mac…") { confirmDelete = true }
                     }
                 }
             }
             Text(tier.blurb).foregroundStyle(.secondary)
+            if tier == .bigger, let hw = model.hardware {
+                Label(ModelFit.biggerWarning(pick, ramBytes: hw.ramBytes, budgetBytes: model.picks.budgetBytes), systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout)
+                    .foregroundStyle(Color.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Text("\(Fmt.bytes(m.file.size)) on disk · uses about \(Fmt.bytes(pick.footprintBytes)) of memory while loaded")
                 .font(.callout).foregroundStyle(.secondary)
             if case .downloading(let p) = mine { ProgressView(value: p.fraction).tint(Color.water) }
-            if case .failed(_, let msg) = mine { Text(msg).font(.callout).foregroundStyle(.red) }
+            if case .failed(_, let msg, _) = mine { Text(msg).font(.callout).foregroundStyle(.red) }
+            if installed, let v = m.vision {
+                HStack(spacing: 6) {
+                    Image(systemName: "photo").foregroundStyle(.secondary)
+                    switch visionDL {
+                    case .downloading(let p):
+                        Text("Image understanding: downloading \(Int(p.fraction * 100))%").foregroundStyle(.secondary)
+                    case .verifying:
+                        Text("Image understanding: checking…").foregroundStyle(.secondary)
+                    case .paused, .failed:
+                        Text("Image understanding: download stopped").foregroundStyle(.secondary)
+                        Button("Resume") { model.startDownload(m.id, vision: true) }.buttonStyle(.link)
+                    case .idle:
+                        if visionReady {
+                            Text("Image understanding: ready").foregroundStyle(.secondary)
+                        } else {
+                            Text("Image understanding needs a \(Fmt.bytes(v.size)) add-on").foregroundStyle(.secondary)
+                            Button("Download") { model.startDownload(m.id, vision: true) }.buttonStyle(.link)
+                        }
+                    }
+                }
+                .font(.callout)
+            }
             DisclosureGroup("Details") {
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
                     GridRow { Text("Model").foregroundStyle(.secondary); Text(m.name) }
@@ -157,11 +197,70 @@ private struct TierCard: View {
             .font(.callout)
         }
         .padding(.vertical, 6)
-        .confirmationDialog("Delete \(Fmt.tierLabel(tier, pick)) from this Mac?", isPresented: $confirmDelete) {
-            Button("Delete \(Fmt.bytes(m.file.size))", role: .destructive) { model.removeModel(m.id) }
+        .confirmationDialog("Remove \(Fmt.tierLabel(tier, pick)) from this Mac?", isPresented: $confirmDelete) {
+            Button("Remove and free \(Fmt.bytes(reclaimable))", role: .destructive) { model.removeModel(m.id) }
+            Button("Keep it", role: .cancel) {}
         } message: {
-            Text("You can download it again any time.")
+            Text(model.activeModelId == m.id && model.installed.count == 1
+                 ? "This frees \(Fmt.bytes(reclaimable)). It’s your only AI, so chat stays locked until you download one again."
+                 : "This frees \(Fmt.bytes(reclaimable)). You can download it again any time from here.")
         }
+    }
+}
+
+private struct MemoryPane: View {
+    @Environment(AppModel.self) private var model
+    @State private var newFact = ""
+    @State private var confirmClear = false
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle(isOn: Binding(get: { model.settings.memoryEnabled }, set: { v in model.update { $0.memoryEnabled = v } })) {
+                    Text("Remember things across chats")
+                    Text("Tarn saves useful facts you share, like your name or preferences, and uses them in new chats. Stored only on this Mac.")
+                }
+                Text("Tarn can also search your earlier chats when you mention them.").font(.callout).foregroundStyle(.secondary)
+            }
+            Section {
+                HStack {
+                    TextField("Add something Tarn should remember", text: $newFact)
+                        .onSubmit(add)
+                    Button("Add", action: add).disabled(newFact.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                if model.memories.isEmpty {
+                    Text("Nothing saved yet. Tell Tarn something about yourself, or add it here.").foregroundStyle(.secondary)
+                }
+                ForEach(model.memories) { m in
+                    HStack(alignment: .top) {
+                        Text(m.text).textSelection(.enabled)
+                        Spacer()
+                        Button(role: .destructive) { model.deleteMemory(m.id) } label: { Image(systemName: "trash") }
+                            .buttonStyle(.borderless)
+                            .help("Forget this")
+                            .accessibilityLabel("Forget: \(m.text)")
+                    }
+                }
+            } header: {
+                Text("What Tarn remembers (\(model.memories.count))")
+            }
+            if !model.memories.isEmpty {
+                Section {
+                    Button("Forget everything…", role: .destructive) { confirmClear = true }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .confirmationDialog("Forget all \(model.memories.count) memories?", isPresented: $confirmClear) {
+            Button("Forget everything", role: .destructive) { model.clearMemories() }
+        } message: {
+            Text("Your chats stay; only the saved facts are deleted.")
+        }
+    }
+
+    private func add() {
+        let msg = model.rememberFact(newFact)
+        if msg == "Saved to memory." { newFact = "" } else { model.showToast(msg, error: msg.hasPrefix("Not saved")) }
     }
 }
 
@@ -498,7 +597,7 @@ private struct AboutPane: View {
                     Mark(size: 34)
                     VStack(alignment: .leading) {
                         Text("Tarn \(version)").font(.title2.weight(.semibold))
-                        Text("A private AI that runs on your Mac. Made by Rishab Kumar Jha, an independent developer in India.").foregroundStyle(.secondary)
+                        Text("A private AI that runs on your Mac. Free and open source.").foregroundStyle(.secondary)
                     }
                 }
             }
@@ -511,8 +610,9 @@ private struct AboutPane: View {
                     .foregroundStyle(.secondary)
                 Link("llama.cpp on GitHub", destination: URL(string: "https://github.com/ggml-org/llama.cpp")!)
             }
-            Section("Contact") {
-                Link("kumarjharishab@gmail.com", destination: URL(string: "mailto:kumarjharishab@gmail.com?subject=Tarn")!)
+            Section("Source and feedback") {
+                Link("Tarn on GitHub", destination: URL(string: "https://github.com/Rishab87/tarn")!)
+                Link("Report a problem", destination: URL(string: "https://github.com/Rishab87/tarn/issues")!)
             }
         }
         .formStyle(.grouped)

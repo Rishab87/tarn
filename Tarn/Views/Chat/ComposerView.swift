@@ -55,7 +55,7 @@ struct ComposerView: View {
                             .background(Color.water.opacity(0.14), in: .capsule)
                             .help(folder)
                         }
-                        ForEach(files) { f in FileChip(name: f.name) { files.removeAll { $0.id == f.id } } }
+                        ForEach(files) { f in FileChip(attachment: f) { files.removeAll { $0.id == f.id } } }
                     }
                 }
             }
@@ -64,6 +64,18 @@ struct ComposerView: View {
                 .font(.system(size: 15))
                 .lineLimit(1...10)
                 .focused($focused)
+                .onKeyPress(keys: ["v"], phases: .down) { press in
+                    // ⌘V with an image or file on the clipboard attaches it instead of pasting text.
+                    guard press.modifiers.contains(.command) else { return .ignored }
+                    let pb = NSPasteboard.general
+                    let hasText = pb.string(forType: .string) != nil
+                    let hasFiles = (pb.types ?? []).contains(.fileURL)
+                    guard hasFiles || !hasText else { return .ignored }
+                    let pasted = Attachments.fromPasteboard(pb)
+                    guard !pasted.isEmpty else { return .ignored }
+                    files = Array((files + pasted).prefix(10))
+                    return .handled
+                }
                 .onKeyPress(.return, phases: .down) { press in
                     if press.modifiers.contains(.shift) || press.modifiers.contains(.option) {
                         draft.wrappedValue += "\n"
@@ -74,7 +86,7 @@ struct ComposerView: View {
                 }
                 .padding(.top, 2)
             HStack(spacing: 2) {
-                ToolbarIcon(symbol: "paperclip", help: "Attach files (text and PDF)") {
+                ToolbarIcon(symbol: "paperclip", help: "Attach images, PDFs or text files") {
                     files = Array((files + model.pickAttachments()).prefix(10))
                 }
                 ToolbarIcon(symbol: "folder", help: "Let Tarn work in a folder", on: chat?.folder != nil) { model.shareFolder() }
@@ -90,21 +102,17 @@ struct ComposerView: View {
                 Spacer()
                 ModelPicker()
                 if answering, let chat {
-                    Button { model.stop(chat.id) } label: {
-                        Image(systemName: "stop.fill").font(.system(size: 11)).frame(width: 30, height: 30)
-                    }
-                    .buttonStyle(.glassProminent).tint(.primary)
-                    .clipShape(.circle)
-                    .help("Stop")
-                    .keyboardShortcut(".", modifiers: .command)
+                    Button { model.stop(chat.id) } label: { Image(systemName: "stop.fill").font(.system(size: 11)) }
+                        .buttonStyle(SendButtonStyle())
+                        .help("Stop")
+                        .keyboardShortcut(".", modifiers: .command)
+                        .accessibilityLabel("Stop answering")
                 } else {
-                    Button(action: send) {
-                        Image(systemName: "arrow.up").font(.system(size: 14, weight: .bold)).frame(width: 30, height: 30)
-                    }
-                    .buttonStyle(.glassProminent).tint(.primary)
-                    .clipShape(.circle)
-                    .disabled(!canSend)
-                    .help("Send (Return)")
+                    Button(action: send) { Image(systemName: "arrow.up") }
+                        .buttonStyle(SendButtonStyle())
+                        .disabled(!canSend)
+                        .help("Send (Return)")
+                        .accessibilityLabel("Send")
                 }
             }
         }
@@ -172,7 +180,7 @@ private struct LockedComposer: View {
                 case .paused(let p):
                     Text("Download paused").font(.headline)
                     Text("\(Fmt.bytes(p.received)) of \(Fmt.bytes(p.total))").font(.callout).foregroundStyle(.secondary)
-                case .failed(_, let message):
+                case .failed(_, let message, _):
                     Text("The download stopped").font(.headline)
                     Text(message).font(.callout).foregroundStyle(.secondary)
                 case .idle:
@@ -184,10 +192,10 @@ private struct LockedComposer: View {
             Spacer()
             switch model.download {
             case .downloading: Button("Pause") { model.pauseDownload() }.buttonStyle(.glass)
-            case .paused(let p): Button("Resume") { model.startDownload(p.modelId) }.buttonStyle(.glassProminent).tint(.primary)
-            case .failed(let id, _): Button("Try again") { model.startDownload(id) }.buttonStyle(.glassProminent).tint(.primary)
+            case .paused(let p): Button("Resume") { model.startDownload(p.modelId, vision: p.isVision) }.primaryButton()
+            case .failed(let id, _, let vision): Button("Try again") { model.startDownload(id, vision: vision) }.primaryButton()
             case .idle:
-                if let rec { Button("Download") { model.startDownload(rec.model.id) }.buttonStyle(.glassProminent).tint(.primary) }
+                if let rec { Button("Download") { model.startDownload(rec.model.id) }.primaryButton() }
             case .verifying: EmptyView()
             }
         }
@@ -211,7 +219,9 @@ struct ModelPicker: View {
                         model.setTier(t)
                     } label: {
                         Text(Fmt.tierLabel(t, p) + (model.activeTier == t && installed ? "  ✓" : ""))
-                        Text(installed ? t.blurb : downloading ? "Downloading… \(Int((model.download.progress?.fraction ?? 0) * 100))%" : "Download · \(Fmt.bytes(p.model.file.size))")
+                        Text(installed ? (t == .bigger ? "⚠︎ Asks a lot of this Mac. Best with nothing else open." : t.blurb)
+                             : downloading ? "Downloading… \(Int((model.download.progress?.fraction ?? 0) * 100))%"
+                             : t == .bigger ? "⚠︎ Download · \(Fmt.bytes(p.model.file.size)) · may slow your Mac" : "Download · \(Fmt.bytes(p.model.file.size))")
                     }
                 }
             }

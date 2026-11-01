@@ -46,10 +46,17 @@ struct SidebarView: View {
     var body: some View {
         let selection = Binding<String?>(get: { model.currentId }, set: { model.openChat($0) })
         List(selection: selection) {
+            Button { model.newChat() } label: {
+                Label("New chat", systemImage: "square.and.pencil")
+            }
+            .buttonStyle(.plain)
+            .padding(.vertical, 4)
+            .help("New chat (⌘N)")
             if groups.isEmpty {
                 Text(search.isEmpty ? "Your chats will appear here. They’re saved on this Mac only." : "No chats match that.")
                     .foregroundStyle(.secondary)
                     .font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.vertical, 6)
             }
             ForEach(groups, id: \.0) { label, chats in
@@ -60,12 +67,6 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) { SidebarFooter() }
-        .toolbar {
-            ToolbarItem {
-                Button { model.newChat() } label: { Label("New chat", systemImage: "square.and.pencil") }
-                    .help("New chat (⌘N)")
-            }
-        }
     }
 }
 
@@ -114,6 +115,7 @@ private struct SidebarFooter: View {
             HStack(spacing: 8) {
                 Circle().fill(dotColor).frame(width: 7, height: 7)
                 Text(statusText).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+                    .help(model.activeModelId == nil ? "Tarn’s AI isn’t installed yet" : "\(tierLabel) runs on this Mac")
                 Spacer()
                 SettingsLink { Image(systemName: "gearshape") }
                     .buttonStyle(.borderless)
@@ -128,16 +130,17 @@ private struct SidebarFooter: View {
         Fmt.tierLabel(model.activeTier, model.picks.pick(model.activeTier))
     }
 
+    /// Short enough for a narrow sidebar; the full model name is in the tooltip and the composer.
     private var statusText: String {
         if model.activeModelId == nil {
-            if case .downloading(let p) = model.download { return "Downloading your AI · \(Int(p.fraction * 100))%" }
-            return "No AI installed yet"
+            if case .downloading(let p) = model.download { return "Downloading · \(Int(p.fraction * 100))%" }
+            return "No AI yet"
         }
         switch model.engineState {
-        case .ready: return model.engine.likelyAsleep ? "\(tierLabel) · Resting" : "\(tierLabel) · Ready"
-        case .starting: return "\(tierLabel) · Waking up"
-        case .failed: return "\(tierLabel) · Stopped"
-        case .stopped: return "\(tierLabel) · Resting"
+        case .ready: return model.engine.likelyAsleep ? "Resting" : "Ready"
+        case .starting: return "Waking up"
+        case .failed: return "Stopped"
+        case .stopped: return "Resting"
         }
     }
 

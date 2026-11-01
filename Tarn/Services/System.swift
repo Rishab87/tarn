@@ -1,6 +1,8 @@
 import AppKit
 import Foundation
+import ImageIO
 import PDFKit
+import UniformTypeIdentifiers
 import Sparkle
 import UserNotifications
 
@@ -77,13 +79,24 @@ final class Updater: NSObject, ObservableObject {
 enum Attachments {
     static let maxFile: Int64 = 25 << 20
     static let maxChars = 400_000
+    /// Longest side of a stored image. About 1,300 image tokens for the Qwen vision encoders.
+    static let maxImageSide = 1024
 
-    /// Turns a file the user attached into text the model can read.
+    static func validFileName(_ name: String) -> Bool {
+        !name.isEmpty && name.count < 120 && !name.contains("/") && !name.hasPrefix(".") && name.hasSuffix(".jpg")
+    }
+
+    static func isImage(_ url: URL) -> Bool {
+        UTType(filenameExtension: url.pathExtension.lowercased())?.conforms(to: .image) ?? false
+    }
+
+    /// Turns a file the user attached into something the model can read.
     static func read(_ url: URL) throws -> Attachment {
         let name = url.lastPathComponent
         let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
         if size > maxFile { throw ToolFailure("\(name) is larger than 25 MB.") }
         let data = try Data(contentsOf: url)
+        if isImage(url) { return try image(data, name: name) }
         var text: String
         var kind = Attachment.Kind.text
         if url.pathExtension.lowercased() == "pdf" || data.starts(with: Data("%PDF-".utf8)) {
@@ -95,11 +108,52 @@ enum Attachments {
                 throw ToolFailure("\(name) has no selectable text (it may be a scan), so Tarn can’t read it yet.")
             }
         } else {
-            if FolderAccess.looksBinary(data) { throw ToolFailure("Tarn can read text files and PDFs. \(name) is neither.") }
+            if FolderAccess.looksBinary(data) { throw ToolFailure("Tarn can read text files, PDFs and images. \(name) is none of those.") }
             text = String(decoding: data, as: UTF8.self)
         }
         let truncated = text.count > maxChars
         if truncated { text = String(text.prefix(maxChars)) }
         return Attachment(id: newId(), name: name, kind: kind, size: size, text: text, truncated: truncated)
+    }
+
+    /// Downscales an image to at most 1024 px and stores it as JPEG in the attachments folder.
+    static func image(_ data: Data, name: String) throws -> Attachment {
+        guard let src = CGImageSourceCreateWithData(data as CFData, nil),
+              let thumb = CGImageSourceCreateThumbnailAtIndex(src, 0, [
+                  kCGImageSourceCreateThumbnailFromImageAlways: true,
+                  kCGImageSourceCreateThumbnailWithTransform: true,
+                  kCGImageSourceThumbnailMaxPixelSize: maxImageSide,
+              ] as CFDictionary) else {
+            throw ToolFailure("Tarn couldn’t open \(name) as an image.")
+        }
+        let id = newId()
+        let file = "\(id).jpg"
+        let out = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(out, UTType.jpeg.identifier as CFString, 1, nil) else { throw ToolFailure("Tarn couldn’t save \(name).") }
+        CGImageDestinationAddImage(dest, thumb, [kCGImageDestinationLossyCompressionQuality: 0.85] as CFDictionary)
+        guard CGImageDestinationFinalize(dest) else { throw ToolFailure("Tarn couldn’t save \(name).") }
+        try (out as Data).write(to: Paths.attachments.appendingPathComponent(file), options: .atomic)
+        return Attachment(id: id, name: name, kind: .image, size: Int64(out.length), text: "", file: file)
+    }
+
+    /// Images or files on the clipboard (for ⌘V in the message box).
+    static func fromPasteboard(_ pb: NSPasteboard = .general) -> [Attachment] {
+        if let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty {
+            return urls.prefix(10).compactMap { try? read($0) }
+        }
+        for type in [NSPasteboard.PasteboardType.png, .tiff, NSPasteboard.PasteboardType("public.jpeg"), NSPasteboard.PasteboardType("public.heic")] {
+            if let d = pb.data(forType: type), let a = try? image(d, name: "Pasted image") { return [a] }
+        }
+        return []
+    }
+
+    static func imageURL(_ a: Attachment) -> URL? {
+        guard a.kind == .image, let f = a.file, validFileName(f) else { return nil }
+        return Paths.attachments.appendingPathComponent(f)
+    }
+
+    static func dataURL(_ a: Attachment) -> String? {
+        guard let url = imageURL(a), let d = try? Data(contentsOf: url) else { return nil }
+        return "data:image/jpeg;base64," + d.base64EncodedString()
     }
 }

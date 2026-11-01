@@ -88,7 +88,46 @@ enum ModelFit {
                 .filter { $0.model.id != rec.model.id && $0.footprintBytes < rec.footprintBytes }
                 .sorted { $0.footprintBytes < $1.footprintBytes }.first
         }
-        return Picks(recommended: rec, lighter: lighter, budgetBytes: budget)
+        let bigger = biggerPick(above: rec, catalog: catalog, ramBytes: ramBytes, bandwidthGBs: bandwidthGBs)
+        return Picks(recommended: rec, lighter: lighter, bigger: bigger, budgetBytes: budget)
+    }
+
+    static let biggerContext = 8192
+
+    /// The "Most capable" option: a stronger model than the recommended one, offered with a
+    /// warning. Prefers models that at least fit in RAM (fastest of those that meet the speed
+    /// bar, else the quickest); when none fit, the mixture-of-experts model, which slows down
+    /// least when macOS has to page it from disk. None when the recommended model is the best.
+    static func biggerPick(above rec: ModelPick, catalog: [CatalogModel], ramBytes: Int64, bandwidthGBs: Double?) -> ModelPick? {
+        let better = catalog.filter { $0.quality > rec.model.quality }
+        guard !better.isEmpty else { return nil }
+        func make(_ m: CatalogModel) -> ModelPick {
+            ModelPick(model: m, contextTokens: biggerContext, footprintBytes: footprint(m, context: biggerContext), estTokensPerSec: tokensPerSec(m, bandwidthGBs: bandwidthGBs))
+        }
+        let picks = better.map(make)
+        let fitting = picks.filter { Double($0.footprintBytes) <= 0.9 * Double(ramBytes) }
+        if !fitting.isEmpty {
+            let fast = fitting.filter { ($0.estTokensPerSec ?? .infinity) >= minTokensPerSec }
+            if !fast.isEmpty { return fast.max { $0.model.quality < $1.model.quality } }
+            return fitting.max { ($0.estTokensPerSec ?? 0) < ($1.estTokensPerSec ?? 0) }
+        }
+        return picks.min { $0.model.activeParamsB != $1.model.activeParamsB ? $0.model.activeParamsB < $1.model.activeParamsB : $0.footprintBytes < $1.footprintBytes }
+    }
+
+    /// The yellow warning shown next to "Most capable".
+    static func biggerWarning(_ p: ModelPick, ramBytes: Int64, budgetBytes: Int64) -> String {
+        let need = Fmt.bytes(p.footprintBytes)
+        let have = "\(Int((Double(ramBytes) / 1_073_741_824).rounded())) GB"
+        var text: String
+        if Double(p.footprintBytes) > 0.9 * Double(ramBytes) {
+            text = "Needs about \(need) of memory and this Mac has \(have). It may not start, or may make your Mac very slow."
+        } else {
+            text = "Uses about \(need) of your \(have) of memory. Other apps may slow down while it’s loaded."
+        }
+        if let tps = p.estTokensPerSec, tps < minTokensPerSec {
+            text += " Expect about \(max(1, Int(tps * 0.75))) words a second."
+        }
+        return text
     }
 }
 

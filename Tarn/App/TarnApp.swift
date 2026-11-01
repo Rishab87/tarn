@@ -26,8 +26,16 @@ struct TarnApp: App {
                 Divider()
                 Button("Back Up Chats…") { model.exportBackup() }.disabled(!model.booted)
             }
+            CommandGroup(after: .sidebar) {
+                Picker("Appearance", selection: Binding(get: { model.settings.theme }, set: { v in model.update { $0.theme = v } })) {
+                    ForEach(ThemeChoice.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.inline)
+                .disabled(!model.booted)
+            }
             CommandGroup(replacing: .help) {
-                Link("Email the Developer", destination: URL(string: "mailto:kumarjharishab@gmail.com?subject=Tarn")!)
+                Link("Tarn on GitHub", destination: URL(string: "https://github.com/Rishab87/tarn")!)
+                Link("Report a Problem", destination: URL(string: "https://github.com/Rishab87/tarn/issues")!)
                 Button("Show Tarn’s Data Folder") { NSWorkspace.shared.open(Paths.data) }
             }
         }
@@ -41,15 +49,19 @@ struct TarnApp: App {
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        if !model.booted {
-            Color.clear
-        } else if !model.settings.onboarded {
-            OnboardingView()
-        } else {
-            MainView()
+        Group {
+            if !model.booted {
+                Color.clear
+            } else if !model.settings.onboarded {
+                OnboardingView()
+            } else {
+                MainView()
+            }
         }
+        .onChange(of: model.openSettingsRequest) { openSettings() }
     }
 }
 

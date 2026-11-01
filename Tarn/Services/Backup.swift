@@ -30,9 +30,12 @@ enum Backup {
         var skipped = 0
         var skillFiles: [(path: String, data: Data)] = []
         var connectors: [ConnectorConfig] = []
+        var memories: [MemoryItem] = []
+        /// Images attached to chats (attachments/<id>.jpg).
+        var attachmentFiles: [(name: String, data: Data)] = []
     }
 
-    static func export(to dest: URL, chats: [Chat], settings: AppSettings, connectors: [ConnectorConfig]) throws {
+    static func export(to dest: URL, chats: [Chat], settings: AppSettings, connectors: [ConnectorConfig], memories: [MemoryItem] = []) throws {
         try? FileManager.default.removeItem(at: dest)
         let archive = try Archive(url: dest, accessMode: .create)
         func add(_ path: String, _ data: Data) throws {
@@ -47,6 +50,15 @@ enum Backup {
         try add("settings.json", JSONFile.encoder.encode(portable))
         for c in chats where !c.messages.isEmpty { try add("chats/\(c.id).json", JSONFile.encoder.encode(c)) }
         try add("connectors.json", JSONFile.encoder.encode(connectors))
+        try add("memory.json", JSONFile.encoder.encode(memories))
+        for c in chats {
+            for m in c.messages {
+                for a in m.attachments ?? [] where a.kind == .image {
+                    guard let f = a.file, Attachments.validFileName(f), let d = try? Data(contentsOf: Paths.attachments.appendingPathComponent(f)) else { continue }
+                    try add("attachments/\(f)", d)
+                }
+            }
+        }
         let root = Paths.skills
         if let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isRegularFileKey]) {
             while let u = e.nextObject() as? URL {
@@ -102,6 +114,13 @@ enum Backup {
             if let d = data("skills/" + rel) { out.skillFiles.append((rel, d)) }
         }
         out.connectors = data("connectors.json").flatMap { try? JSONFile.decoder.decode([ConnectorConfig].self, from: $0) } ?? []
+        out.memories = (data("memory.json").flatMap { try? JSONFile.decoder.decode([MemoryItem].self, from: $0) } ?? [])
+            .compactMap { m in MemoryStore.normalize(m.text).map { MemoryItem(id: m.id, text: $0, createdAt: m.createdAt) } }
+        for path in files.keys where path.hasPrefix(prefix + "attachments/") {
+            let name = String(path.dropFirst(prefix.count + "attachments/".count))
+            guard Attachments.validFileName(name), let d = data("attachments/" + name) else { continue }
+            out.attachmentFiles.append((name, d))
+        }
         return out
     }
 

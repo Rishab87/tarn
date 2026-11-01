@@ -134,7 +134,7 @@ struct MemoryAlertView: View {
                             model.dismissMemoryAlert()
                             model.setTier(.lighter)
                         }
-                        .buttonStyle(.glassProminent).tint(.primary)
+                        .primaryButton()
                     }
                     Button("Free up memory") { model.freeMemory() }.buttonStyle(.glass)
                     Button("Not now") { model.dismissMemoryAlert() }.buttonStyle(.borderless)
@@ -172,7 +172,7 @@ struct ModelUpdateBanner: View {
                     Text("Downloading… \(Int(p.fraction * 100))%").font(.callout).foregroundStyle(.secondary).monospacedDigit()
                 } else {
                     Button("Later") { model.dismissedUpdates.insert(u.id) }.buttonStyle(.borderless)
-                    Button(u.kind == .file ? "Update" : "Download") { model.applyUpdate(u) }.buttonStyle(.glassProminent).tint(.primary)
+                    Button(u.kind == .file ? "Update" : "Download") { model.applyUpdate(u) }.primaryButton()
                 }
             }
             .padding(.horizontal, 14)
