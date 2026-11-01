@@ -1,0 +1,10 @@
+.DS_Store
+build/
+DerivedData/
+dist/
+vendor/
+Engine/llama/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+scripts/dev/winid
+.secrets/

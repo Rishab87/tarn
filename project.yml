@@ -1,0 +1,106 @@
+name: Tarn
+options:
+  bundleIdPrefix: app.tarn
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_UPCOMING_FEATURE_BARE_SLASH_REGEX_LITERALS: YES
+    SWIFT_STRICT_CONCURRENCY: minimal
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.1
+  MarkdownUI:
+    url: https://github.com/gonzalezreal/swift-markdown-ui
+    exactVersion: 2.4.1
+  ZIPFoundation:
+    url: https://github.com/weichsel/ZIPFoundation
+    exactVersion: 0.9.20
+targets:
+  Tarn:
+    type: application
+    platform: macOS
+    sources:
+      - path: Tarn
+        excludes:
+          - "Resources/Skills"
+          - "Resources/AppIcon.icon"
+          - "Resources/AppIcon.icon/**"
+          - "Info.plist"
+      - path: Tarn/Resources/AppIcon.icon
+        type: file
+        buildPhase: resources
+      - path: Tarn/Resources/Skills
+        type: folder
+        buildPhase: resources
+      - path: Engine/llama
+        excludes:
+          - ".build"
+        buildPhase:
+          copyFiles:
+            destination: executables
+        attributes: [CodeSignOnCopy]
+    dependencies:
+      - package: Sparkle
+      - package: MarkdownUI
+      - package: ZIPFoundation
+    info:
+      path: Tarn/Info.plist
+      properties:
+        CFBundleDisplayName: Tarn
+        CFBundleName: Tarn
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.productivity
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSHumanReadableCopyright: Copyright © 2026 Rishab Kumar Jha
+        LSArchitecturePriority: [arm64]
+    entitlements:
+      path: Tarn/Tarn.entitlements
+      properties: {}
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.tarn.mac
+        PRODUCT_NAME: Tarn
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        ARCHS: arm64
+        ONLY_ACTIVE_ARCH: YES
+        DEAD_CODE_STRIPPING: YES
+        COMBINE_HIDPI_IMAGES: YES
+      configs:
+        Debug:
+          ENABLE_HARDENED_RUNTIME: NO
+        Release:
+          ENABLE_HARDENED_RUNTIME: YES
+  TarnTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [TarnTests]
+    dependencies:
+      - target: Tarn
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: app.tarn.mac.tests
+        BUNDLE_LOADER: $(TEST_HOST)
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Tarn.app/Contents/MacOS/Tarn
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+schemes:
+  Tarn:
+    build:
+      targets:
+        Tarn: all
+        TarnTests: [test]
+    test:
+      targets: [TarnTests]
+      environmentVariables:
+        TARN_DATA_DIR: $(TARGET_TEMP_DIR)/tarn-test-data

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Tarn: a mountain ridge above a still lake. Drawn on a 32-unit grid scaled 20.48x, centered. -->
+  <g transform="translate(512 512) scale(20.48) translate(-16 -17.6)">
+    <path d="M3 19 L11 8.5 L15.5 14 L19.5 9.5 L29 19" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M6 23.5 C10 21.2 22 21.2 26 23.5 C22 27 10 27 6 23.5 Z" fill="#fff"/>
+  </g>
+</svg>
