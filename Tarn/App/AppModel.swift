@@ -63,6 +63,8 @@ final class AppModel {
         applyTheme()
         var hw = await HardwareInfo.detect()
         #if DEBUG
+        // Test hook: -TarnTheme dark forces the appearance for screenshots.
+        if let raw = UserDefaults.standard.string(forKey: "TarnTheme"), let theme = ThemeChoice(rawValue: raw) { update { $0.theme = theme } }
         // Test hook: -TarnSimulateRAMGB 8 makes model picks behave like a Mac with that much memory.
         let simGB = UserDefaults.standard.integer(forKey: "TarnSimulateRAMGB")
         if simGB > 0 {
@@ -657,9 +659,44 @@ final class AppModel {
             m.ms = Int(genMs > 0 ? genMs : Date().timeIntervalSince(started) * 1000)
         }
         mutate(chatId) { $0.updatedAt = Date() }
+        afterAnswerJobs += 1
         runs[chatId] = nil
         refreshSummaries()
         if store.chats[chatId]?.title == "New chat", store.chats[chatId]?.messages.last?.status == .done { await nameChat(chatId) }
+        if store.chats[chatId]?.messages.last?.status == .done { await extractMemories(chatId, messageId) }
+        afterAnswerJobs -= 1
+    }
+
+    /// Titles and memory checks still running after answers finished (scripts wait on these).
+    private var afterAnswerJobs = 0
+
+    /// After an answer, quietly saves lasting facts the user shared (like Claude and ChatGPT do).
+    /// Skipped when memory is off, when the model already used `remember` this turn, or when the
+    /// message has no personal cues.
+    private func extractMemories(_ chatId: String, _ messageId: String) async {
+        guard settings.memoryEnabled, case .ready(let id, _) = engineState,
+              let chat = store.chats[chatId], let answer = chat.messages.first(where: { $0.id == messageId }),
+              let user = chat.messages.last(where: { $0.role == .user }) else { return }
+        let usedTool = answer.blocks.contains { if case .tool(let t) = $0 { t.name == "remember" } else { false } }
+        // The 2B model saves too much noise (measured: 5 wrong saves in 21 test messages), so it only
+        // saves facts when it calls `remember` itself.
+        guard !usedTool, (Catalog.model(id)?.quality ?? 0) >= 40, MemoryExtraction.worthChecking(user.text) else { return }
+        var body: [String: Any] = ["model": "tarn", "max_tokens": 160, "temperature": 0.1, "stream": false,
+                                   "messages": MemoryExtraction.prompt(userText: user.text, known: memories)]
+        if Catalog.model(id)?.thinking == .optional { body["chat_template_kwargs"] = ["enable_thinking": false] }
+        guard let reply = try? await LLM.complete(baseURL: engine.baseURL, apiKey: engine.apiKey, body: body) else { return }
+        var saved: [String] = []
+        for fact in MemoryExtraction.parse(reply) {
+            guard let clean = MemoryStore.normalize(fact) else { continue }
+            let r = MemoryStore.adding(clean, to: memories)
+            if r.added {
+                memories = r.items
+                saved.append(clean)
+            }
+        }
+        guard !saved.isEmpty else { return }
+        MemoryStore.save(memories)
+        setMessage(chatId, messageId, persist: true) { $0.memorySaved = saved }
     }
 
     /// Streams one model turn into the message, batching UI updates to ~16 per second.
@@ -988,6 +1025,10 @@ final class AppModel {
             Task { await runScript(path) }
             return
         }
+        if let mode = d.string(forKey: "TarnDemo") {
+            Task { await runDemo(mode) }
+            return
+        }
         guard let text = d.string(forKey: "TarnAutoSend"), settings.onboarded else { return }
         Task {
             try? await Task.sleep(for: .seconds(1))
@@ -1051,6 +1092,8 @@ final class AppModel {
         var folder: String?
         var thinking: Bool?
         var waitForVision: Bool?
+        /// Seconds to keep the window as it is after the answer (for screenshots).
+        var hold: Double?
     }
 
     /// Plays chat steps from a JSON file, logging each answer, then quits (tests the quit path too).
@@ -1088,16 +1131,118 @@ final class AppModel {
             _ = send(step.text, attachments: files)
             try? await Task.sleep(for: .seconds(0.5))
             _ = await waitUntil(900) { !isAnswering(currentId) }
+            let t0 = Date()
+            _ = await waitUntil(120) { afterAnswerJobs == 0 }
             if let m = current?.messages.last {
                 let tools = m.blocks.compactMap { if case .tool(let t) = $0 { "\(t.name):\(t.status.rawValue)" } else { nil } }
                 let thought = m.blocks.contains { if case .thinking = $0 { true } else { false } }
-                tourLog("ANSWER model=\(m.modelId ?? "-") status=\(m.status?.rawValue ?? "?") tools=\(tools) thinking=\(thought) error=\(m.error ?? "-")")
+                tourLog("ANSWER model=\(m.modelId ?? "-") status=\(m.status?.rawValue ?? "?") tools=\(tools) thinking=\(thought) ms=\(m.ms ?? -1) error=\(m.error ?? "-")")
                 tourLog("TEXT \(m.visibleText.replacingOccurrences(of: "\n", with: " ").prefix(500))")
+                tourLog(String(format: "AFTER %.1fs saved=%@", Date().timeIntervalSince(t0), (m.memorySaved ?? []).description))
+            }
+            if let hold = step.hold {
+                tourLog("HOLD \(hold)")
+                try? await Task.sleep(for: .seconds(hold))
             }
         }
         tourLog("MEMORIES \(memories.map(\.text))")
         tourLog("DONE")
         try? await Task.sleep(for: .seconds(1))
+        NSApp.terminate(nil)
+    }
+
+    // MARK: Launch-video demo (Debug only)
+
+    /// Scene marks use wall-clock time so the editor can line them up with the recording.
+    private func mark(_ name: String) {
+        tourLog(String(format: "MARK %.3f %@", Date().timeIntervalSince1970, name))
+    }
+
+    /// Pins the main window to a fixed frame above other windows so the screen recorder can
+    /// capture a known rectangle, and reports that rectangle (top-left origin, points).
+    private func pinWindowForRecording() {
+        guard let w = NSApp.windows.first(where: { $0.isVisible && $0.frame.width > 700 }), let screen = w.screen ?? NSScreen.main else { return }
+        let size = NSSize(width: 1280, height: 800)
+        let origin = NSPoint(x: screen.frame.midX - size.width / 2, y: screen.frame.midY - size.height / 2)
+        w.setFrame(NSRect(origin: origin, size: size), display: true)
+        w.level = .floating
+        w.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+        let topY = screen.frame.maxY - (origin.y + size.height)
+        tourLog(String(format: "RECT %.0f,%.0f,%.0f,%.0f", origin.x - screen.frame.minX, topY, size.width, size.height))
+    }
+
+    /// Types text into the message box at a human pace, then sends it.
+    private func demoType(_ text: String, cps: Double = 28) async {
+        let key = currentId ?? "new"
+        drafts[key] = ""
+        for ch in text {
+            drafts[key, default: ""].append(ch)
+            try? await Task.sleep(for: .seconds(1 / cps))
+        }
+        try? await Task.sleep(for: .seconds(0.5))
+    }
+
+    private func demoAsk(_ text: String, attach: [Attachment] = [], scene: String) async {
+        await demoType(text)
+        mark("\(scene)-send")
+        drafts[currentId ?? "new"] = ""
+        _ = send(text, attachments: attach)
+        try? await Task.sleep(for: .seconds(0.4))
+        _ = await waitUntil(600) { !isAnswering(currentId) }
+        mark("\(scene)-done")
+        try? await Task.sleep(for: .seconds(2))
+    }
+
+    private func runDemo(_ mode: String) async {
+        update { $0.theme = .light }
+        try? await Task.sleep(for: .seconds(1.5))
+        pinWindowForRecording()
+        tourLog("WAIT-RECORDER")
+        // The harness starts the screen recorder, then writes "go" to tour.ack.
+        let ack = Paths.data.appendingPathComponent("tour.ack")
+        _ = await waitUntil(30) { (try? String(contentsOf: ack, encoding: .utf8))?.contains("go") == true }
+        try? await Task.sleep(for: .seconds(1))
+        if mode == "onboarding" {
+            mark("welcome"); try? await Task.sleep(for: .seconds(3.5))
+            onboardingStep = 1; mark("origin"); try? await Task.sleep(for: .seconds(3))
+            onboardingStep = 2; mark("setup")
+            // -TarnDemoSetupSeconds N ends the take after N seconds of live download.
+            let limit = UserDefaults.standard.double(forKey: "TarnDemoSetupSeconds")
+            let ready = await waitUntil(limit > 0 ? limit : 900) { isInstalled(picks.recommended?.model.id) }
+            if ready { mark("ready") }
+            try? await Task.sleep(for: .seconds(4))
+        } else {
+            _ = await waitUntil(180) { if case .ready = engineState { true } else { false } }
+            newChat(); mark("empty"); try? await Task.sleep(for: .seconds(2.5))
+            await demoAsk("Plan a relaxed weekend in Jaipur for two. Keep it short, with a rough budget in rupees.", scene: "chat")
+            newChat()
+            await demoAsk("What's the weather in Delhi this weekend? Search the web and keep it brief.", scene: "web")
+            newChat()
+            if let shot = UserDefaults.standard.string(forKey: "TarnDemoImage"), let img = try? Attachments.read(URL(fileURLWithPath: shot)) {
+                await demoAsk("What's in this screenshot? Two sentences.", attach: [img], scene: "image")
+            }
+            newChat()
+            await demoAsk("I'm Rishab, I live in Pune and I'm vegetarian. Remember that.", scene: "memory")
+            newChat()
+            await demoAsk("Suggest a dinner for tonight, in one line.", scene: "recall")
+            if let folder = UserDefaults.standard.string(forKey: "TarnDemoFolder") {
+                let c = createChat()
+                mutate(c.id) { $0.folder = folder }
+                await demoType("Read trip.txt and make a packing list file for it.")
+                mark("folder-send")
+                drafts[c.id] = ""
+                _ = send("Read trip.txt and make a packing list file for it.", attachments: [])
+                _ = await waitUntil(300) { !approvals.isEmpty }
+                mark("approval"); try? await Task.sleep(for: .seconds(3))
+                for k in approvals.keys { approve(k, .once) }
+                _ = await waitUntil(300) { !isAnswering(currentId) }
+                mark("folder-done"); try? await Task.sleep(for: .seconds(2))
+            }
+        }
+        mark("end")
+        tourLog("DONE")
+        try? await Task.sleep(for: .seconds(1.5))
         NSApp.terminate(nil)
     }
 

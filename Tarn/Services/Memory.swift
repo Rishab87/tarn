@@ -46,17 +46,121 @@ enum MemoryStore {
         return (keep, items.count - keep.count)
     }
 
-    /// The part of the system prompt that carries memories: newest first, capped in size.
-    static func promptSection(_ items: [MemoryItem]) -> String? {
+    static let stopwords: Set<String> = ["the", "and", "for", "with", "that", "this", "you", "your", "are", "was", "what", "how",
+                                          "can", "could", "would", "should", "about", "have", "has", "from", "into", "they", "them", "she", "his", "her",
+                                          "him", "who", "why", "when", "where", "which", "will", "just", "like", "want", "need", "tell", "give", "make", "please"]
+
+    static func keywords(_ text: String) -> Set<String> {
+        Set(text.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init).filter { $0.count >= 3 && !stopwords.contains($0) })
+    }
+
+    /// Same word, allowing simple endings: practice/practices/practising, dog/dogs, learn/learning.
+    static func sameWord(_ a: String, _ b: String) -> Bool {
+        if a == b { return true }
+        let (s, l) = a.count <= b.count ? (a, b) : (b, a)
+        if s.count >= 7 { return l.hasPrefix(s.prefix(s.count - 2)) }
+        if s.count >= 5 { return l.hasPrefix(s.prefix(s.count - 1)) }
+        return s.count >= 3 && l.hasPrefix(s) && l.count - s.count <= 3
+    }
+
+    static func overlap(_ memory: String, _ query: Set<String>) -> Int {
+        keywords(memory).filter { m in query.contains { sameWord(m, $0) } }.count
+    }
+
+    /// Memories ordered for the prompt: the ones that share words with the current message
+    /// first (so the right facts are in view when they matter), then the most recent.
+    static func ranked(_ items: [MemoryItem], for query: String) -> [MemoryItem] {
+        let q = keywords(query)
+        guard !q.isEmpty else { return items }
+        let scored = items.enumerated().map { (i, m) in (m, overlap(m.text, q), i) }
+        return scored.sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.2 < $1.2 }.map(\.0)
+    }
+
+    /// Diet and health facts are standing constraints: they matter for any food, travel or
+    /// activity request even when the message shares no words with them ("dinner" vs "vegetarian").
+    static let constraintCues = ["vegetarian", "vegan", "allerg", "diabet", "gluten", "lactose", "halal", "kosher", "jain", "keto",
+                                 "pescatarian", "eggetarian", "doesn't eat", "does not eat", "no meat", "intoleran", "celiac", "coeliac",
+                                 "pregnan", "blood pressure", "asthma", "wheelchair", "sober", "doesn't drink", "does not drink"]
+
+    static func isConstraint(_ text: String) -> Bool {
+        let t = text.lowercased()
+        return constraintCues.contains { t.contains($0) }
+    }
+
+    /// The part of the system prompt that carries memories. Diet and health constraints come
+    /// first, then facts that share words with the current message, then everything else, so the
+    /// model uses the right ones and leaves the rest alone.
+    static func promptSection(_ items: [MemoryItem], query: String = "") -> String? {
         guard !items.isEmpty else { return nil }
-        var lines: [String] = []
+        let q = keywords(query)
+        var constraints: [String] = [], relevant: [String] = [], other: [String] = []
         var used = 0
-        for m in items {
+        for m in ranked(items, for: query) {
             used += m.text.count
-            if used > 2400 || lines.count >= 40 { break }
-            lines.append("- \(m.text)")
+            if used > 2400 || constraints.count + relevant.count + other.count >= 40 { break }
+            if isConstraint(m.text) { constraints.append("- \(m.text)") }
+            else if !q.isEmpty && overlap(m.text, q) > 0 { relevant.append("- \(m.text)") }
+            else { other.append("- \(m.text)") }
         }
-        return "What you remember about the user from earlier chats (use it naturally; don’t recite it unless asked):\n" + lines.joined(separator: "\n")
+        var text = "What you remember about the user from earlier chats. Use it whenever it applies to what they are asking now: a meal idea must fit their diet, and a weekend plan can start from their city. Don’t bring up memories that have nothing to do with the request (like a pet or their job) just to sound personal, and don’t list what you remember unless asked."
+        if !constraints.isEmpty { text += "\nAlways respect these whenever they apply:\n" + constraints.joined(separator: "\n") }
+        if !relevant.isEmpty { text += "\nProbably relevant to this message:\n" + relevant.joined(separator: "\n") }
+        if !other.isEmpty { text += "\n" + (constraints.isEmpty && relevant.isEmpty ? "" : "Other things you know:\n") + other.joined(separator: "\n") }
+        return text
+    }
+}
+
+/// Background memory extraction: after each answer, a short local prompt pulls durable facts
+/// out of what the user just said.
+enum MemoryExtraction {
+    static func prompt(userText: String, known: [MemoryItem]) -> [[String: Any]] {
+        let knownList = known.prefix(30).map { "- \($0.text)" }.joined(separator: "\n")
+        let system = """
+        You maintain a personal assistant's long-term memory about its user. Read the user's message and pull out lasting facts about the user that would help in future, unrelated conversations. Users often mention these in passing while asking for something else, so look inside requests and questions too.
+
+        Worth saving: name, city or country, job, studies and exams, family members and pets (with names), health conditions, allergies and diet, hobbies and skills they are learning, things they own that they ask about (car, phone), language and style preferences, long-running goals and projects.
+        Not worth saving: the request itself, passing moods ("I'm tired today"), one-off tasks, anything already known, and secrets (passwords, card or account numbers, exact addresses, ID numbers).
+
+        Examples:
+        User: My son Kabir has a cricket match Saturday, what should I pack for him?
+        ["Has a son named Kabir who plays cricket."]
+        User: Translate this to French: good morning
+        []
+        User: I'm a dentist in Kochi and I want to post more on Instagram, ideas?
+        ["Is a dentist in Kochi.", "Wants to grow their Instagram presence."]
+        User: I'm bored, tell me a joke
+        []
+        User: Please call me Sam, and I'm studying for my CA finals in May.
+        ["Prefers to be called Sam.", "Is studying for CA finals in May."]
+
+        Reply with only a JSON array of short third-person sentences, or [] if there is nothing new.
+        """ + (knownList.isEmpty ? "" : "\n\nAlready known:\n\(knownList)")
+        return [["role": "system", "content": system], ["role": "user", "content": String(userText.prefix(4000))]]
+    }
+
+    /// Pulls an array of strings out of a model reply, tolerating extra text around it and the
+    /// single-quoted lists small models sometimes write.
+    static func parse(_ reply: String) -> [String] {
+        let cleaned = reply.replacing(/(?s)<think>.*?<\/think>/, with: "")
+        guard let start = cleaned.firstIndex(of: "["), let end = cleaned.lastIndex(of: "]"), start < end else { return [] }
+        let list = String(cleaned[start...end])
+        var items: [String]
+        if let data = list.data(using: .utf8), let arr = try? JSONSerialization.jsonObject(with: data) as? [Any] {
+            items = arr.compactMap { $0 as? String }
+        } else {
+            // ['Owns a car.', 'Likes the user\'s… ']: an apostrophe followed by a letter is part of a word.
+            items = list.matches(of: /'((?:[^'\\]|\\.|'(?=[a-zA-Z]))*)'/).map { String($0.output.1).replacingOccurrences(of: "\\'", with: "'") }
+        }
+        return items.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }.prefix(5).map { $0 }
+    }
+
+    /// Messages too short or purely task-like are skipped without asking the model.
+    static func worthChecking(_ text: String) -> Bool {
+        let t = text.lowercased()
+        guard t.count >= 15 else { return false }
+        let cues = ["i'm", "i am", "my ", "i live", "i work", "i study", "i have", "i like", "i love", "i prefer", "i hate", "i don't", "i do not",
+                    "we're", "we are", "our ", "call me", "i've", "i was born", "i usually", "i always", "i never", "remember"]
+        return cues.contains { t.contains($0) }
     }
 }
 

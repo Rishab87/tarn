@@ -348,6 +348,8 @@ struct Message: Codable, Equatable, Identifiable {
     var modelId: String? = nil
     var tokens: Int? = nil
     var ms: Int? = nil
+    /// Facts saved to memory after this answer (shown as "Memory updated").
+    var memorySaved: [String]? = nil
 
     var visibleText: String {
         role == .user ? text : blocks.compactMap { if case .text(let t) = $0 { t } else { nil } }.joined(separator: "\n\n")

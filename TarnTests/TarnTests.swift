@@ -344,6 +344,26 @@ struct MemoryTests {
         #expect(MemoryStore.promptSection(items)?.contains("- Name is Sam.") == true)
     }
 
+    @Test func extractionParsingAndCues() {
+        #expect(MemoryExtraction.parse("Sure! [\"Is a nurse.\", \"Has a dog named Bruno.\"]") == ["Is a nurse.", "Has a dog named Bruno."])
+        #expect(MemoryExtraction.parse("<think>hmm</think>[]").isEmpty)
+        #expect(MemoryExtraction.parse("nothing here").isEmpty)
+        #expect(MemoryExtraction.parse("['Owns a 2019 Honda City.', 'Is learning the guitar that's acoustic.']") == ["Owns a 2019 Honda City.", "Is learning the guitar that's acoustic."])
+        #expect(MemoryExtraction.worthChecking("I work night shifts as a nurse in Pune"))
+        #expect(!MemoryExtraction.worthChecking("What's 2+2?"))
+    }
+
+    @Test func recallsRelevantMemoriesFirst() {
+        var items: [MemoryItem] = []
+        for t in ["Has a dog named Bruno.", "Is vegetarian.", "Lives in Pune.", "Works as a nurse."] { items = MemoryStore.adding(t, to: items).items }
+        let ranked = MemoryStore.ranked(items, for: "Suggest a vegetarian dinner recipe")
+        #expect(ranked.first?.text == "Is vegetarian.")
+        let section = MemoryStore.promptSection(items + MemoryStore.adding("Is learning fingerstyle guitar and practices daily.", to: []).items, query: "What should I practice this week?") ?? ""
+        #expect(section.contains("Always respect these whenever they apply:\n- Is vegetarian.\nProbably relevant to this message:\n- Is learning fingerstyle guitar and practices daily.\nOther things you know:"))
+        #expect(MemoryStore.promptSection(items, query: "walk my dogs")?.contains("relevant to this message:\n- Has a dog named Bruno.") == true)
+        #expect(MemoryStore.sameWord("learn", "learning") && MemoryStore.sameWord("practice", "practising") && !MemoryStore.sameWord("cat", "category"))
+    }
+
     @Test func searchesPastChats() {
         var a = Chat(id: "a1", title: "Goa trip", createdAt: Date(), updatedAt: Date())
         a.messages = [Message(id: "m", role: .user, createdAt: Date(), text: "Book a beach shack in Goa for December")]

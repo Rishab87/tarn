@@ -15,7 +15,8 @@ enum Prompt {
         ]
         let about = settings.aboutYou.trimmingCharacters(in: .whitespacesAndNewlines)
         if !about.isEmpty { lines.append("\nWhat the user wants you to know about them:\n\(about)") }
-        if settings.memoryEnabled, let section = MemoryStore.promptSection(memories) { lines.append("\n" + section) }
+        let lastUser = chat.messages.last(where: { $0.role == .user })?.text ?? ""
+        if settings.memoryEnabled, let section = MemoryStore.promptSection(memories, query: lastUser) { lines.append("\n" + section) }
         if toolNames.contains("remember") {
             lines.append("\nWhen the user tells you something about themselves that would help in future chats (name, work, location, preferences, ongoing plans), save it with remember, without asking. If they ask you to forget something, use forget. If they mention an earlier conversation, use search_past_chats.")
         }

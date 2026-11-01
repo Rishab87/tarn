@@ -23,12 +23,17 @@ New models arrive only through app updates: edit `scripts/catalog.source.json`, 
 
 What each Mac gets (these are enforced by `TarnTests`):
 
-| Mac | Recommended | Lighter |
-|---|---|---|
-| 8 GB (M1–M3, MacBook Neo) | Qwen3.5 4B at 16K context | Qwen3.5 2B |
-| 16 GB | Qwen3.5 9B at 32K | Qwen3.5 4B |
-| 24 GB | Qwen3.5 9B | Qwen3.5 4B |
-| 32 GB and up | Qwen3.6 35B-A3B (mixture of experts, 3B active) | Qwen3.5 9B |
+| Mac | Recommended | Lighter | Most capable (yellow warning) |
+|---|---|---|---|
+| 8 GB (M1–M3, MacBook Neo) | Qwen3.5 4B at 16K context | Qwen3.5 2B | Qwen3.5 9B |
+| 16 GB | Qwen3.5 9B at 32K | Qwen3.5 4B | Qwen3.6 35B-A3B, 3-bit (13.2 GB) |
+| 24 GB | Qwen3.5 9B | Qwen3.5 4B | Qwen3.6 35B-A3B, 4-bit (17.7 GB) |
+| 32 GB and up, base or Pro chip | Qwen3.6 35B-A3B (mixture of experts, 3B active) | Qwen3.5 9B | Qwen3.8 27B (slow on these chips) |
+| 32 GB and up, Max or Ultra chip | Qwen3.8 27B | Qwen3.5 9B | none: Recommended is already the best |
+
+"Most capable" is the next model up, run at 8K context and fitted to the GPU. It may make the Mac slow while loaded, which the warning says.
+
+**Why no 12B–15B model:** the only 9–22B models on Artificial Analysis's small-model list (2026-11-01) are Gemma 4 12B and gpt-oss-20b. Both are left out for the reasons below. A bigger model from an older generation would be slower without being better at tool use. The 24 GB gap (same pick as 16 GB) closes when a model that beats Qwen3.5 9B at ~10 GB ships.
 
 llama.app (by the llama.cpp team) budgets min(GPU working set − 1 GB, RAM − 4 GB). On a 16 GB Mac that is about 10.8 GB. Tarn deliberately stays at 50% there, because the brief is "don't slow the Mac while browsing".
 

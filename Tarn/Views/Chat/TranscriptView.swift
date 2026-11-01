@@ -17,6 +17,10 @@ struct TranscriptView: View {
         } } ?? 0
         ScrollViewReader { proxy in
             ScrollView {
+                // Short chats fill the visible height with the messages at the bottom. Leaving the
+                // space empty instead lets macOS paint a lighter band above them in dark mode.
+                ZStack(alignment: .bottom) {
+                Color.clear.containerRelativeFrame(.vertical)
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(chat.messages) { m in
                         if m.role == .user {
@@ -31,6 +35,7 @@ struct TranscriptView: View {
                 .padding(.horizontal, 28)
                 .padding(.top, 20)
                 .frame(maxWidth: .infinity)
+                }
             }
             .defaultScrollAnchor(.bottom)
             .onScrollGeometryChange(for: Bool.self) { g in
@@ -162,6 +167,17 @@ private struct AssistantMessageView: View {
             }
             if message.status == .stopped {
                 Text("Stopped").font(.callout.italic()).foregroundStyle(.tertiary)
+            }
+            if let saved = message.memorySaved, !saved.isEmpty {
+                Button {
+                    model.settingsTab = "memory"
+                    model.openSettingsRequest += 1
+                } label: {
+                    Label("Memory updated", systemImage: "brain.head.profile").font(.caption)
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .help(saved.joined(separator: "\n"))
             }
             if !streaming, message.status != .error {
                 HStack(spacing: 2) {
