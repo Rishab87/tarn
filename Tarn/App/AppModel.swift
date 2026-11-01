@@ -1152,6 +1152,8 @@ final class AppModel {
         var waitForVision: Bool?
         /// Seconds to keep the window as it is after the answer (for screenshots).
         var hold: Double?
+        /// Put this chat in a sidebar folder with this name, creating the folder if needed.
+        var intoFolder: String?
     }
 
     /// Plays chat steps from a JSON file, logging each answer, then quits (tests the quit path too).
@@ -1197,6 +1199,10 @@ final class AppModel {
                 tourLog("ANSWER model=\(m.modelId ?? "-") status=\(m.status?.rawValue ?? "?") tools=\(tools) thinking=\(thought) ms=\(m.ms ?? -1) error=\(m.error ?? "-")")
                 tourLog("TEXT \(m.visibleText.replacingOccurrences(of: "\n", with: " ").prefix(500))")
                 tourLog(String(format: "AFTER %.1fs saved=%@", Date().timeIntervalSince(t0), (m.memorySaved ?? []).description))
+            }
+            if let name = step.intoFolder, let id = currentId {
+                if let g = groups.first(where: { $0.name == name }) { moveChat(id, to: g.id) } else { createGroup(name, moving: id) }
+                tourLog("INFO folder \(name) <- \(current?.title ?? id)")
             }
             if let hold = step.hold {
                 tourLog("HOLD \(hold)")
