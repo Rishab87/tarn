@@ -222,7 +222,7 @@ h1 {
 .clip:nth-child(3) { --r: 0.8deg; --y: -6px; }
 .clip:nth-child(4) { --r: -1deg; --y: 20px; }
 .clip:hover { transform: rotate(0deg) translateY(-4px); }
-.clip .clip-video { aspect-ratio: 4 / 3; height: auto; }
+.clip .clip-video { aspect-ratio: 16 / 10; height: auto; }
 
 .titlebar {
   display: flex;

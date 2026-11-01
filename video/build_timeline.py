@@ -22,64 +22,62 @@ def marks(name: str) -> dict[str, float]:
     return out
 
 
-def typing_start(send: float, prompt: str) -> float:
-    return send - len(prompt) / TYPE_CPS - 0.5
-
-
 m = marks("main")
 o = marks("onboarding") if (HERE / "footage" / "onboarding.marks").exists() else None
 
 PROMPTS = {
-    "chat": "Plan a relaxed weekend in Jaipur for two. Keep it short, with a rough budget in rupees.",
-    "web": "What's the weather in Delhi this weekend? Search the web and keep it brief.",
-    "image": "Split this bill between the 3 of us, in one line.",
-    "memory": "I live in Pune and I'm vegetarian. Remember that.",
-    "recall": "Suggest a dinner for tonight, in one line.",
-    "folder": "Read trip.txt and make a packing list file for it.",
+    "memory": "I'm a product manager at a fintech startup, and I like short answers in bullet points. Remember that.",
+    "doc": "Turn my meeting notes into a clean summary with decisions and action items with owners, and save it as a Word doc.",
+    "email": "Draft a reply: I'll send them by Thursday 5 pm, and Pune dipped because the store was being renovated in August.",
+    "lease": "I'm about to sign this rental agreement. What should I watch out for? Keep it short.",
+    "web": "Find a good beginner 5K plan online and turn it into a simple 3-days-a-week schedule. Keep it short.",
+    "post": "Write a short LinkedIn post announcing our UPI autopay launch.",
 }
 
 # Camera framing on the 1280x800 window (x, y = centre in 0..1 from top-left, z = zoom).
-FULL = (0.5, 0.5, 1.0)
 COMPOSER_EMPTY = (0.555, 0.53, 1.6)   # the centred box on a new chat
-ANSWER = (0.56, 0.56, 1.32)           # the reply, above the bottom composer
+ANSWER = (0.56, 0.58, 1.3)            # the reply, above the bottom composer
+CARD = (0.6, 0.6, 1.42)               # the "Create … ?" approval card
 
 
 def cams(*keys):
     return [{"t": t, "x": c[0], "y": c[1], "z": c[2]} for t, c in keys]
 
 
-def scene(name, beats, caption, typing_part=0.32, tail=0.6, cam=None, type_caption=True, cut=False, end_key=None):
-    """A clip that shows the prompt being typed (slowed to fit `typing_part` of the segment),
-    then the answer arriving, sped up to fill the rest."""
+def scene(name, beats, caption, typing_part=0.4, show_typing=2.6, tail=1.2, type_caption=True):
+    """The last `show_typing` seconds of the prompt being typed, then the answer arriving,
+    sped up to fill the rest of the segment."""
     send = m[f"{name}-send"]
-    start = typing_start(send, PROMPTS[name])
-    done = m[end_key or f"{name}-done"] + tail
+    typed = len(PROMPTS[name]) / TYPE_CPS + 0.5
+    start = send - min(typed, show_typing)
+    done = m[f"{name}-done"] + tail
     seg = {
-        "type": "clip",
-        "src": "footage/main.mov",
-        "beats": beats,
-        "caption": caption,
-        "map": [[0, start], [typing_part, send + 0.25], [1, done]],
-        "cam": cam or cams((0, COMPOSER_EMPTY), (typing_part, COMPOSER_EMPTY), (typing_part + 0.12, ANSWER), (1, ANSWER)),
+        "type": "clip", "src": "footage/main.mov", "beats": beats, "caption": caption,
+        "map": [[0, start], [typing_part, send + 0.3], [1, done]],
+        "cam": cams((0, COMPOSER_EMPTY), (typing_part, COMPOSER_EMPTY), (typing_part + 0.1, ANSWER), (1, ANSWER)),
     }
     if not type_caption:
         seg["typeCaption"] = False
-    if cut:
-        seg["cut"] = True
     return seg
 
+
+send, card, done = m["doc-send"], m["approval"], m["doc-done"]
+doc = {
+    "type": "clip", "src": "footage/main.mov", "beats": 14, "caption": "turns messy notes into a clean doc.",
+    "map": [[0, send - 3.2], [0.3, send + 0.3], [0.42, card + 0.3], [0.74, card + 3.1], [1, done + 1.5]],
+    "cam": cams((0, COMPOSER_EMPTY), (0.3, COMPOSER_EMPTY), (0.4, CARD), (0.74, CARD), (0.84, ANSWER), (1, ANSWER)),
+}
 
 segments = [
     {"type": "text", "beats": 8, "lines": ["ai for everyone."]},
     {"type": "text", "beats": 8, "lines": ["it lives on your mac."]},
     {"type": "logo", "beats": 2},
-    scene("chat", 12, "plan a weekend."),
-    scene("web", 8, "look things up."),
-    scene("image", 10, "split the bill."),
-    scene("memory", 8, "it remembers you."),
-    scene("recall", 6, "it remembers you.", type_caption=False),
-    scene("folder", 12, "works in your folders.", typing_part=0.22,
-          cam=cams((0, COMPOSER_EMPTY), (0.22, COMPOSER_EMPTY), (0.34, ANSWER), (1, ANSWER))),
+    doc,
+    scene("email", 10, "replies to your email."),
+    scene("lease", 10, "reads the fine print."),
+    scene("memory", 6, "remembers how you work.", typing_part=0.5),
+    scene("post", 8, "remembers how you work.", type_caption=False),
+    scene("web", 8, "looks things up."),
 ]
 
 if o:

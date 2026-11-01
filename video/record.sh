@@ -21,9 +21,10 @@ echo "recording $CROP"
 ffmpeg -hide_banner -loglevel error -f avfoundation -pixel_format nv12 -framerate 60 -capture_cursor 0 \
   -i "Capture screen 0:none" -vf "$CROP" -c:v h264_videotoolbox -b:v 40M -g 30 -pix_fmt yuv420p -y "$OUT/$MODE.mov" &
 REC=$!
-# Start the clock once frames are actually being written.
-for i in {1..100}; do [[ $(stat -f%z "$OUT/$MODE.mov" 2>/dev/null || echo 0) -gt 200000 ]] && break; sleep 0.05; done
 START=$(python3 -c 'import time; print(f"{time.time():.3f}")')
+# Wait until frames are actually being written before the demo starts. Measured: the first frame
+# lands ~0.3 s after launch, so START (taken at launch) lines marks up with the video within a frame or two.
+for i in {1..100}; do [[ $(stat -f%z "$OUT/$MODE.mov" 2>/dev/null || echo 0) -gt 200000 ]] && break; sleep 0.05; done
 echo go > "$PROFILE/tour.ack"
 sleep 2
 PID=$(pgrep -n -f "$APP/Contents/MacOS/Tarn")

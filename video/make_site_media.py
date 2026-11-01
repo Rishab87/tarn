@@ -25,44 +25,39 @@ def marks() -> dict[str, float]:
 
 m = marks()
 PROMPTS = {
-    "chat": "Plan a relaxed weekend in Jaipur for two. Keep it short, with a rough budget in rupees.",
-    "web": "What's the weather in Delhi this weekend? Search the web and keep it brief.",
-    "image": "Split this bill between the 3 of us, in one line.",
-    "memory": "I live in Pune and I'm vegetarian. Remember that.",
-    "recall": "Suggest a dinner for tonight, in one line.",
-    "folder": "Read trip.txt and make a packing list file for it.",
+    "memory": "I'm a product manager at a fintech startup, and I like short answers in bullet points. Remember that.",
+    "doc": "Turn my meeting notes into a clean summary with decisions and action items with owners, and save it as a Word doc.",
 }
-
-
-def typing(name: str) -> float:
-    return m[f"{name}-send"] - len(PROMPTS[name]) / TYPE_CPS - 0.5
-
 
 # Crops on the 2560x1600 recording (the app window at 2x).
 FULL = "crop=2560:1600:0:0"
-TRANSCRIPT = "crop=1844:1382:512:160"   # 4:3 around the chat column, without the sidebar
+CHAT = "crop=1840:1150:620:380"   # 16:10 around the conversation, without the sidebar
 
+send, card, done = m["doc-send"], m["approval"], m["doc-done"]
 CLIPS = {
     "hero": dict(crop=FULL, size="1920:1200", crf=21, pieces=[
-        (typing("chat") - 0.8, m["chat-send"] + 0.4, 1.3),
-        (m["chat-send"] + 0.4, m["chat-done"], 4.0),
-        (m["chat-done"], m["chat-done"] + 2.0, 1.0),
+        (send - len(PROMPTS["doc"]) / TYPE_CPS - 0.8, send + 0.3, 1.4),
+        (send + 0.3, card + 0.2, 8.0),
+        (card + 0.2, card + 3.2, 1.0),
+        (card + 3.2, done + 0.5, 5.0),
+        (done + 0.5, done + 1.9, 1.0),
     ]),
-    "split-the-bill": dict(crop=TRANSCRIPT, size="800:600", crf=24, pieces=[
-        (m["image-send"] - 0.3, m["image-done"], 2.5),
-        (m["image-done"], m["image-done"] + 2.0, 1.0),
+    "replies-to-email": dict(crop=CHAT, size="1040:650", crf=23, pieces=[
+        (m["email-send"] - 0.2, m["email-done"], 2.6),
+        (m["email-done"], m["email-done"] + 2.5, 1.0),
     ]),
-    "remembers-you": dict(crop=TRANSCRIPT, size="800:600", crf=24, pieces=[
-        (m["memory-send"] - 0.3, m["memory-done"] + 1.0, 2.0),
-        (m["recall-send"] - 0.3, m["recall-done"] + 2.0, 1.6),
+    "reads-the-fine-print": dict(crop=CHAT, size="1040:650", crf=23, pieces=[
+        (m["lease-send"] - 0.2, m["lease-done"], 2.2),
+        (m["lease-done"], m["lease-done"] + 2.5, 1.0),
     ]),
-    "looks-things-up": dict(crop=TRANSCRIPT, size="800:600", crf=24, pieces=[
-        (m["web-send"] - 0.3, m["web-done"], 3.0),
-        (m["web-done"], m["web-done"] + 2.0, 1.0),
+    "remembers-you": dict(crop=CHAT, size="1040:650", crf=23, pieces=[
+        (m["memory-send"] - 0.2, m["memory-done"] + 1.0, 2.0),
+        (m["post-send"] - 0.2, m["post-done"], 1.8),
+        (m["post-done"], m["post-done"] + 2.5, 1.0),
     ]),
-    "packs-for-goa": dict(crop=TRANSCRIPT, size="800:600", crf=24, pieces=[
-        (m["folder-send"] - 0.3, m["approval"] - 1.0, 8.0),
-        (m["approval"] - 1.0, m["folder-done"] + 2.0, 2.2),
+    "looks-things-up": dict(crop=CHAT, size="1040:650", crf=23, pieces=[
+        (m["web-send"] - 0.2, m["web-done"], 4.0),
+        (m["web-done"], m["web-done"] + 2.5, 1.0),
     ]),
 }
 
