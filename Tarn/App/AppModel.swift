@@ -1282,8 +1282,10 @@ final class AppModel {
             _ = await waitUntil(180) { if case .ready = engineState { true } else { false } }
             newChat(); mark("empty"); try? await Task.sleep(for: .seconds(2.5))
             await demoAsk("Plan a relaxed weekend in Jaipur for two. Keep it short, with a rough budget in rupees.", scene: "chat")
+            if let id = currentId { createGroup("Trips", moving: id) }
             newChat()
             await demoAsk("What's the weather in Delhi this weekend? Search the web and keep it brief.", scene: "web")
+            if let id = currentId, let trips = groups.first(where: { $0.name == "Trips" }) { moveChat(id, to: trips.id) }
             newChat()
             if let shot = UserDefaults.standard.string(forKey: "TarnDemoImage"), let img = try? Attachments.read(URL(fileURLWithPath: shot)) {
                 await demoAsk("Split this bill between the 3 of us, in one line.", attach: [img], scene: "image")

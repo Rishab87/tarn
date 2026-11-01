@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 import ZIPFoundation
@@ -596,5 +597,67 @@ struct ChatGroupTests {
         let old = try Backup.read(oldZip)
         #expect(old.groups.isEmpty)
         #expect(old.chats.map(\.id) == ["old1"])
+    }
+}
+
+@Suite("Documents")
+struct DocumentTests {
+    func scratchFolder() throws -> URL {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("tarn-docs-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    @Test func wordRoundTrip() throws {
+        let dir = try scratchFolder()
+        let url = dir.appendingPathComponent("summary.docx")
+        try Documents.write("# Q4 launch\n- **Owner:** Priya\n- [ ] Fix checkout\n1. Ship on Friday", to: url)
+        let data = try Data(contentsOf: url)
+        #expect(data.starts(with: Data("PK".utf8)))   // a real .docx is a zip package
+        let text = try #require(try Documents.text(url, data))
+        #expect(text.contains("Q4 launch") && text.contains("Owner: Priya") && text.contains("Fix checkout") && text.contains("Ship on Friday"))
+        #expect(!text.contains("**") && !text.contains("# "))
+    }
+
+    @Test func readFileReadsPDFsAndWord() async throws {
+        let dir = try scratchFolder()
+        // A one-page PDF with real text.
+        let pdf = NSMutableData()
+        var box = CGRect(x: 0, y: 0, width: 612, height: 792)
+        let ctx = CGContext(consumer: CGDataConsumer(data: pdf)!, mediaBox: &box, nil)!
+        ctx.beginPDFPage(nil)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
+        NSAttributedString(string: "Security deposit: six months of rent", attributes: [.font: NSFont.systemFont(ofSize: 14)]).draw(at: CGPoint(x: 72, y: 700))
+        NSGraphicsContext.restoreGraphicsState()
+        ctx.endPDFPage()
+        ctx.closePDF()
+        try (pdf as Data).write(to: dir.appendingPathComponent("lease.pdf"))
+        try Documents.write("Notes from **today**", to: dir.appendingPathComponent("notes.docx"))
+
+        var chat = Chat(id: "d1", title: "Docs", createdAt: Date(), updatedAt: Date())
+        chat.folder = dir.path
+        let ctxTool = ToolContext(chat: chat)
+        let lease = try await ReadFileTool().run(["path": "lease.pdf"], ctxTool)
+        #expect(lease.contains("Security deposit: six months of rent"))
+        let notes = try await ReadFileTool().run(["path": "notes.docx"], ctxTool)
+        #expect(notes.contains("Notes from today"))
+        // Word files are never edited in place (that would drop their formatting).
+        await #expect(throws: ToolFailure.self) {
+            _ = try await EditFileTool().run(["path": "notes.docx", "old_text": "today", "new_text": "Monday"], ctxTool)
+        }
+        // write_file to .docx makes a Word document.
+        _ = try await WriteFileTool().run(["path": "clean.docx", "content": "# Clean\n- one"], ctxTool)
+        let clean = try Data(contentsOf: dir.appendingPathComponent("clean.docx"))
+        #expect(clean.starts(with: Data("PK".utf8)))
+    }
+
+    @Test func attachingAWordDocument() throws {
+        let dir = try scratchFolder()
+        let url = dir.appendingPathComponent("cover-letter.docx")
+        try Documents.write("Dear hiring team,\nI build **fintech** products.", to: url)
+        let a = try Attachments.read(url)
+        #expect(a.kind == .text)
+        #expect(a.text.contains("I build fintech products."))
     }
 }

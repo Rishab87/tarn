@@ -99,16 +99,11 @@ enum Attachments {
         if isImage(url) { return try image(data, name: name) }
         var text: String
         var kind = Attachment.Kind.text
-        if url.pathExtension.lowercased() == "pdf" || data.starts(with: Data("%PDF-".utf8)) {
-            kind = .pdf
-            guard let doc = PDFDocument(data: data) else { throw ToolFailure("Tarn couldn’t read \(name). It may be damaged.") }
-            if doc.isLocked { throw ToolFailure("\(name) is password-protected.") }
-            text = (0..<doc.pageCount).compactMap { i in doc.page(at: i)?.string.map { "[Page \(i + 1)]\n\($0)" } }.joined(separator: "\n\n")
-            if text.replacing(/\[Page \d+\]/, with: "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                throw ToolFailure("\(name) has no selectable text (it may be a scan), so Tarn can’t read it yet.")
-            }
+        if let doc = try Documents.text(url, data) {
+            kind = Documents.isPDF(url, data) ? .pdf : .text
+            text = doc
         } else {
-            if FolderAccess.looksBinary(data) { throw ToolFailure("Tarn can read text files, PDFs and images. \(name) is none of those.") }
+            if FolderAccess.looksBinary(data) { throw ToolFailure("Tarn can read text files, Word documents, PDFs and images. \(name) is none of those.") }
             text = String(decoding: data, as: UTF8.self)
         }
         let truncated = text.count > maxChars

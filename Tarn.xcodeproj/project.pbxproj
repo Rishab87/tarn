@@ -49,6 +49,7 @@
 		D568AE5C6392F6509594CAC7 /* llama.cpp-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 1094ED2AB695CF32FDAB510F /* llama.cpp-LICENSE.txt */; };
 		DBF95DFE22147467792F159B /* TarnApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CB445F322662A7BE507B107 /* TarnApp.swift */; };
 		DFF5D3B3C64D2B94AA3F0B3F /* Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBF8BC24B9AEDD82BCCC30D7 /* Types.swift */; };
+		E5CF79824A86B2C34930CB30 /* Documents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4A6BF883E67F0391E3A5E0F /* Documents.swift */; };
 		E60742AD2CA04CB7F12D3337 /* TranscriptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23EE181B797485DD9F11012E /* TranscriptView.swift */; };
 		E6A5FED6A518808B7C2B07EF /* ComposerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42525A1128C1A2B3EED84A45 /* ComposerView.swift */; };
 		EC88683D4AC5BC0EAC799FC0 /* LLM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 037EBE2822261A00B49EE34E /* LLM.swift */; };
@@ -118,6 +119,7 @@
 		92FFA622BDE1CF3BD1824FD9 /* libllama.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = libllama.0.dylib; sourceTree = "<group>"; };
 		9ADBD00AFF8B7D34AA792CE9 /* Skills */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Skills; path = Tarn/Resources/Skills; sourceTree = SOURCE_ROOT; };
 		9F835F2861AAE00E5736799C /* libggml-metal.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = "libggml-metal.0.dylib"; sourceTree = "<group>"; };
+		A4A6BF883E67F0391E3A5E0F /* Documents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Documents.swift; sourceTree = "<group>"; };
 		A558329BFF628B22B7D555F5 /* Storage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Storage.swift; sourceTree = "<group>"; };
 		ADFEF3C0A0F57DFA4B4D263A /* Downloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Downloader.swift; sourceTree = "<group>"; };
 		B6C898566B0856A41ABDCAF6 /* libggml-rpc.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = "libggml-rpc.0.dylib"; sourceTree = "<group>"; };
@@ -247,6 +249,7 @@
 			isa = PBXGroup;
 			children = (
 				E973F4B3B78706B835E122D8 /* Backup.swift */,
+				A4A6BF883E67F0391E3A5E0F /* Documents.swift */,
 				ADFEF3C0A0F57DFA4B4D263A /* Downloader.swift */,
 				C38CED4ED88E809AC509ED73 /* Engine.swift */,
 				63878171FF66490C86FF3392 /* HardwareInfo.swift */,
@@ -442,6 +445,7 @@
 				CE7BE853FADE813F14180C75 /* Catalog.swift in Sources */,
 				7E0F85484956BEF4F92DA6B6 /* ChatView.swift in Sources */,
 				E6A5FED6A518808B7C2B07EF /* ComposerView.swift in Sources */,
+				E5CF79824A86B2C34930CB30 /* Documents.swift in Sources */,
 				079FA16B504A5B7B67332A45 /* Downloader.swift in Sources */,
 				BBC0945437BB9EB0115F953B /* Engine.swift in Sources */,
 				C68795F484151C7B305EB004 /* FileTools.swift in Sources */,

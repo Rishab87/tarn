@@ -86,7 +86,7 @@ struct ListFilesTool: Tool {
 
 struct ReadFileTool: Tool {
     let name = "read_file"
-    let description = "Read a text file from the shared folder. Long files can be read in parts with offset and limit (line numbers)."
+    let description = "Read a file from the shared folder: text, Markdown, CSV, Word (.docx), RTF or PDF. Long files can be read in parts with offset and limit (line numbers)."
     var parameters: [String: Any] {
         schema([
             "path": ["type": "string", "description": "File path relative to the shared folder."],
@@ -105,8 +105,14 @@ struct ReadFileTool: Tool {
         let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
         if size > 20 << 20 { throw ToolFailure("That file is too large to read (over 20 MB).") }
         let data = try Data(contentsOf: url)
-        if FolderAccess.looksBinary(data) { throw ToolFailure("That file isn’t text (it looks like an image, archive or other binary file).") }
-        let lines = String(decoding: data, as: UTF8.self).components(separatedBy: "\n")
+        let content: String
+        if let doc = try Documents.text(url, data) {
+            content = doc
+        } else {
+            if FolderAccess.looksBinary(data) { throw ToolFailure("That file isn’t text, a Word document or a PDF (it looks like an image, archive or other binary file).") }
+            content = String(decoding: data, as: UTF8.self)
+        }
+        let lines = content.components(separatedBy: "\n")
         let offset = max(1, args.int("offset", default: 1))
         let limit = max(1, args.int("limit", default: 2000))
         let slice = lines.dropFirst(offset - 1).prefix(limit)
@@ -150,7 +156,7 @@ struct SearchFilesTool: Tool {
 
 struct WriteFileTool: Tool {
     let name = "write_file"
-    let description = "Create a new file or replace an existing file in the shared folder. The user approves every write."
+    let description = "Create a new file or replace an existing file in the shared folder. The user approves every write. For a Word document use a .docx path and write the content as simple Markdown (# headings, - bullets, 1. lists, **bold**); Tarn saves it as a formatted document."
     var parameters: [String: Any] {
         schema(["path": ["type": "string", "description": "File path relative to the shared folder."], "content": ["type": "string", "description": "The complete file contents."]], required: ["path", "content"])
     }
@@ -167,7 +173,7 @@ struct WriteFileTool: Tool {
         let url = try FolderAccess.inside(root, try args.string("path"), mustExist: false)
         let content = args["content"] as? String ?? ""
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data(content.utf8).write(to: url, options: .atomic)
+        try Documents.write(content, to: url)
         return "Saved \(FolderAccess.relative(url, to: root)) (\(FolderAccess.size(Int64(content.utf8.count))))."
     }
 }
@@ -192,6 +198,10 @@ struct EditFileTool: Tool {
     func run(_ args: [String: Any], _ ctx: ToolContext) async throws -> String {
         let root = try FolderAccess.root(ctx)
         let url = try FolderAccess.inside(root, try args.string("path"), mustExist: true)
+        if Documents.isRich(url) || url.pathExtension.lowercased() == "pdf" {
+            let stem = url.deletingPathExtension().lastPathComponent
+            throw ToolFailure("Tarn can’t change \(url.lastPathComponent) in place without losing its formatting. Read it, then save an edited copy with write_file, for example “\(stem)-edited.docx”.")
+        }
         let old = try args.string("old_text")
         let new = args["new_text"] as? String ?? ""
         let text = try String(contentsOf: url, encoding: .utf8)
