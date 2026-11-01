@@ -63,7 +63,9 @@ private struct EmptyChatView: View {
             }
             .padding(.bottom, 26)
             ModelUpdateBanner().padding(.bottom, 10)
-            ComposerView(chat: nil)
+            // An empty chat can already exist (a folder was shared before the first message);
+            // pass it so its folder chip and draft show.
+            ComposerView(chat: model.current)
             HStack(spacing: 8) {
                 ForEach(suggestions, id: \.label) { s in
                     Button {

@@ -443,7 +443,15 @@ final class AppModel {
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        let id = currentId ?? createChat().id
+        let id: String
+        if let current = currentId {
+            id = current
+        } else {
+            // Keep whatever was already typed into the new-chat box.
+            id = createChat().id
+            drafts[id] = drafts["new"]
+            drafts["new"] = ""
+        }
         mutate(id) { $0.folder = url.path }
     }
 
@@ -1220,10 +1228,10 @@ final class AppModel {
             await demoAsk("What's the weather in Delhi this weekend? Search the web and keep it brief.", scene: "web")
             newChat()
             if let shot = UserDefaults.standard.string(forKey: "TarnDemoImage"), let img = try? Attachments.read(URL(fileURLWithPath: shot)) {
-                await demoAsk("What's in this screenshot? Two sentences.", attach: [img], scene: "image")
+                await demoAsk("Split this bill between the 3 of us, in one line.", attach: [img], scene: "image")
             }
             newChat()
-            await demoAsk("I'm Rishab, I live in Pune and I'm vegetarian. Remember that.", scene: "memory")
+            await demoAsk("I live in Pune and I'm vegetarian. Remember that.", scene: "memory")
             newChat()
             await demoAsk("Suggest a dinner for tonight, in one line.", scene: "recall")
             if let folder = UserDefaults.standard.string(forKey: "TarnDemoFolder") {
