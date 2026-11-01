@@ -2,13 +2,13 @@
 
 Verified 2026-11-01. Re-check prices before you rely on them.
 
-## Current setup: website and download on Vercel (free Hobby plan)
+## Current setup: website on Vercel, downloads and updates on GitHub Releases
 
-The landing page and `Tarn.dmg` (≈16 MB) are deployed together from `website/`.
+The landing page is deployed from `website/` on Vercel's free Hobby plan. Its download buttons point at `https://github.com/Rishab87/tarn/releases/latest/download/Tarn.dmg`, which is always the newest release. GitHub has no bandwidth cap there, and Sparkle updates come from the same release. A copy of the DMG still sits at `/download/Tarn.dmg` on the site for old links.
 
 | Hobby limit | Value | What it means for Tarn |
 |---|---|---|
-| Fast Data Transfer | 100 GB per month | ≈6,000 downloads a month, counting ~16 MB per download plus page views |
+| Fast Data Transfer | 100 GB per month | Page views only now (each visit loads ~1.5–3 MB of clips): roughly 30–50k visits a month. Downloads come from GitHub |
 | Max upload per deployment (CLI) | 100 MB | Fine for a 16 MB DMG |
 | Use | Non-commercial only | OK while Tarn is free. Selling licenses requires Vercel Pro ($20/month) or moving hosting |
 | Over the limit | Sustained overage can pause the project; paused projects must be resumed by hand | Move the DMG to GitHub Releases before you get near 100 GB |
