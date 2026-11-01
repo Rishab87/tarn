@@ -43,20 +43,24 @@ CLIPS = {
         (done + 0.5, done + 1.9, 1.0),
     ]),
     "replies-to-email": dict(crop=CHAT, size="1040:650", crf=23, pieces=[
-        (m["email-send"] - 0.2, m["email-done"], 2.6),
+        (m["email-send"] - 0.2, 126.5, 6.0),
+        (126.5, m["email-done"], 1.4),
         (m["email-done"], m["email-done"] + 2.5, 1.0),
     ]),
     "reads-the-fine-print": dict(crop=CHAT, size="1040:650", crf=23, pieces=[
-        (m["lease-send"] - 0.2, m["lease-done"], 2.2),
+        (m["lease-send"] - 0.2, 140.7, 3.0),
+        (140.7, m["lease-done"], 1.8),
         (m["lease-done"], m["lease-done"] + 2.5, 1.0),
     ]),
     "remembers-you": dict(crop=CHAT, size="1040:650", crf=23, pieces=[
         (m["memory-send"] - 0.2, m["memory-done"] + 1.0, 2.0),
-        (m["post-send"] - 0.2, m["post-done"], 1.8),
+        (m["post-send"] - 0.2, 207.7, 6.0),
+        (207.7, m["post-done"], 1.6),
         (m["post-done"], m["post-done"] + 2.5, 1.0),
     ]),
     "looks-things-up": dict(crop=CHAT, size="1040:650", crf=23, pieces=[
-        (m["web-send"] - 0.2, m["web-done"], 4.0),
+        (m["web-send"] - 0.2, 173.7, 6.0),
+        (173.7, m["web-done"], 2.6),
         (m["web-done"], m["web-done"] + 2.5, 1.0),
     ]),
 }

@@ -173,7 +173,9 @@ struct WriteFileTool: Tool {
     func approval(_ args: [String: Any], _ ctx: ToolContext) -> ApprovalRequest? {
         let p = args["path"] as? String ?? ""
         let exists = ctx.chat.folder.map { FileManager.default.fileExists(atPath: URL(fileURLWithPath: $0).appendingPathComponent(p).path) } ?? false
-        return ApprovalRequest(title: exists ? "Replace \(p)?" : "Create \(p)?", detail: clip(args["content"] as? String ?? "", 4000))
+        let ext = (p as NSString).pathExtension.lowercased()
+        return ApprovalRequest(title: exists ? "Replace \(p)?" : "Create \(p)?", detail: clip(args["content"] as? String ?? "", 4000),
+                               rendered: ["docx", "doc", "md", "markdown", "rtf", "odt"].contains(ext))
     }
 
     func run(_ args: [String: Any], _ ctx: ToolContext) async throws -> String {

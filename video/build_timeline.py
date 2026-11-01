@@ -36,7 +36,7 @@ PROMPTS = {
 
 # Camera framing on the 1280x800 window (x, y = centre in 0..1 from top-left, z = zoom).
 COMPOSER_EMPTY = (0.555, 0.53, 1.6)   # the centred box on a new chat
-ANSWER = (0.56, 0.58, 1.3)            # the reply, above the bottom composer
+ANSWER = (0.56, 0.64, 1.4)            # the reply, above the bottom composer
 CARD = (0.6, 0.6, 1.42)               # the "Create … ?" approval card
 
 
@@ -44,16 +44,23 @@ def cams(*keys):
     return [{"t": t, "x": c[0], "y": c[1], "z": c[2]} for t, c in keys]
 
 
-def scene(name, beats, caption, typing_part=0.4, show_typing=2.6, tail=1.2, type_caption=True):
-    """The last `show_typing` seconds of the prompt being typed, then the answer arriving,
-    sped up to fill the rest of the segment."""
+# When each answer's text starts appearing (after tools and skills), read off the recording.
+TEXT_START = {"email": 126.8, "lease": 141.0, "web": 174.0, "post": 208.0}
+
+
+def scene(name, beats, caption, typing_part=0.4, show_typing=2.6, type_caption=True):
+    """The last `show_typing` seconds of the prompt being typed; the wait for the answer skimmed;
+    the answer arriving at a readable pace; then the finished answer held for a moment."""
     send = m[f"{name}-send"]
     typed = len(PROMPTS[name]) / TYPE_CPS + 0.5
     start = send - min(typed, show_typing)
-    done = m[f"{name}-done"] + tail
+    done = m[f"{name}-done"]
+    keys = [[0, start], [typing_part, send + 0.3]]
+    if name in TEXT_START:
+        keys.append([typing_part + 0.08, TEXT_START[name] - 0.3])
+    keys += [[0.84, done + 0.3], [1, done + 1.8]]
     seg = {
-        "type": "clip", "src": "footage/main.mov", "beats": beats, "caption": caption,
-        "map": [[0, start], [typing_part, send + 0.3], [1, done]],
+        "type": "clip", "src": "footage/main.mov", "beats": beats, "caption": caption, "map": keys,
         "cam": cams((0, COMPOSER_EMPTY), (typing_part, COMPOSER_EMPTY), (typing_part + 0.1, ANSWER), (1, ANSWER)),
     }
     if not type_caption:

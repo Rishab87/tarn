@@ -284,6 +284,8 @@ struct ApprovalRequest: Codable, Equatable {
     var title: String
     /// Exactly what will happen: the command, the file and its new contents, the connector call.
     var detail: String
+    /// The detail is a document (a Word or Markdown file): show it formatted, not as raw Markdown.
+    var rendered: Bool? = nil
 }
 
 struct ToolBlock: Codable, Equatable {

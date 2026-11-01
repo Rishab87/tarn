@@ -320,14 +320,24 @@ private struct ApprovalCard: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(request.title).font(.headline)
             ScrollView {
-                Text(request.detail)
-                    .font(.system(.callout, design: .monospaced))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
+                Group {
+                    if request.rendered == true {
+                        // A document preview, formatted the way the saved file will look.
+                        Markdown(request.detail).markdownTheme(.tarn).textSelection(.enabled)
+                    } else {
+                        Text(request.detail)
+                            .font(.system(.callout, design: .monospaced))
+                            .textSelection(.enabled)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(request.rendered == true ? 14 : 10)
             }
-            .frame(maxHeight: 200)
-            .background(Color.codeBackground, in: .rect(cornerRadius: 10))
+            .frame(maxHeight: request.rendered == true ? 240 : 200)
+            .background(request.rendered == true ? Color(nsColor: .textBackgroundColor) : Color.codeBackground, in: .rect(cornerRadius: 10))
+            .overlay {
+                if request.rendered == true { RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary) }
+            }
             HStack {
                 Spacer()
                 Button("Don’t allow") { model.approve(blockId, .deny) }.buttonStyle(.borderless)
