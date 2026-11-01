@@ -689,3 +689,31 @@ struct SaveReminderTests {
         #expect(!AppModel.wantsFile("What files are in this folder?"))
     }
 }
+
+@Suite("Download speed")
+struct DownloadSpeedTests {
+    @Test func ignoresTheSecondSpentConnecting() {
+        let t0 = Date(timeIntervalSince1970: 0)
+        var meter = SpeedMeter()
+        meter.restart(at: t0)
+        meter.add(16_000, at: t0.addingTimeInterval(1.0))       // connecting: almost nothing arrives
+        #expect(meter.bytesPerSec == 0)                          // so no "about 113 hours left"
+        meter.add(20_000_000, at: t0.addingTimeInterval(2.0))
+        #expect(meter.bytesPerSec == 20_000_000)
+        #expect(Fmt.eta((5.7e9 - 20_016_000) / meter.bytesPerSec) == "about 5 minutes")
+    }
+
+    @Test func keepsTheLastSpeedAcrossAResume() {
+        let t0 = Date(timeIntervalSince1970: 0)
+        var meter = SpeedMeter()
+        meter.restart(at: t0)
+        meter.add(1_000, at: t0.addingTimeInterval(1))
+        meter.add(10_000_000, at: t0.addingTimeInterval(2))
+        meter.restart(at: t0.addingTimeInterval(60))
+        meter.add(1_000, at: t0.addingTimeInterval(61))
+        #expect(meter.bytesPerSec == 10_000_000)
+        meter.add(30_000_000, at: t0.addingTimeInterval(62))
+        #expect(abs(meter.bytesPerSec - 16_000_000) < 1)
+    }
+}
+

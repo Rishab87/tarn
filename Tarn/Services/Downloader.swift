@@ -28,9 +28,7 @@ final class Downloader: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     private var session: URLSession!
     private var handle: FileHandle?
     private var received: Int64 = 0
-    private var speed: Double = 0
-    private var windowStart = Date()
-    private var windowBytes: Int64 = 0
+    private var meter = SpeedMeter()
     private var lastEmit = Date.distantPast
     private var continuation: CheckedContinuation<Void, Error>?
     private var cancelled = false
@@ -125,8 +123,7 @@ final class Downloader: NSObject, URLSessionDataDelegate, @unchecked Sendable {
         var req = URLRequest(url: url)
         if have > 0 { req.setValue("bytes=\(have)-", forHTTPHeaderField: "Range") }
         received = have
-        windowStart = Date()
-        windowBytes = 0
+        meter.restart()
         try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
             lock.lock()
             continuation = c
@@ -186,15 +183,8 @@ final class Downloader: NSObject, URLSessionDataDelegate, @unchecked Sendable {
             return
         }
         received += Int64(data.count)
-        windowBytes += Int64(data.count)
         let now = Date()
-        let dt = now.timeIntervalSince(windowStart)
-        if dt >= 1 {
-            let inst = Double(windowBytes) / dt
-            speed = speed == 0 ? inst : speed * 0.7 + inst * 0.3
-            windowStart = now
-            windowBytes = 0
-        }
+        meter.add(Int64(data.count), at: now)
         if received > expectedSize {
             dataTask.cancel()
             try? FileManager.default.removeItem(at: partURL)
@@ -203,12 +193,12 @@ final class Downloader: NSObject, URLSessionDataDelegate, @unchecked Sendable {
         }
         if now.timeIntervalSince(lastEmit) > 0.25 {
             lastEmit = now
-            onProgress(Progress(received: received, total: expectedSize, bytesPerSec: speed))
+            onProgress(Progress(received: received, total: expectedSize, bytesPerSec: meter.bytesPerSec))
         }
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        onProgress(Progress(received: received, total: expectedSize, bytesPerSec: speed))
+        onProgress(Progress(received: received, total: expectedSize, bytesPerSec: meter.bytesPerSec))
         if let error {
             finish(isCancelled ? DownloadError(kind: .cancelled, message: "Download paused")
                 : DownloadError(kind: .network, message: error.localizedDescription))
@@ -225,5 +215,36 @@ final class Downloader: NSObject, URLSessionDataDelegate, @unchecked Sendable {
             hasher.update(data: chunk)
         }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+
+/// Download speed, measured over one-second windows and smoothed. The first window after a request
+/// starts is ignored: it includes the time spent connecting, so it reads far too slow (a 5.7 GB model
+/// once showed "about 113 hours left" for its first two seconds).
+struct SpeedMeter {
+    private(set) var bytesPerSec: Double = 0
+    private var windowStart = Date()
+    private var windowBytes: Int64 = 0
+    private var windows = 0
+
+    /// Starts a new measurement when a request starts. The last speed stays until there is a new one.
+    mutating func restart(at now: Date = Date()) {
+        windowStart = now
+        windowBytes = 0
+        windows = 0
+    }
+
+    mutating func add(_ bytes: Int64, at now: Date = Date()) {
+        windowBytes += bytes
+        let dt = now.timeIntervalSince(windowStart)
+        guard dt >= 1 else { return }
+        windows += 1
+        if windows > 1 {
+            let inst = Double(windowBytes) / dt
+            bytesPerSec = bytesPerSec == 0 ? inst : bytesPerSec * 0.7 + inst * 0.3
+        }
+        windowStart = now
+        windowBytes = 0
     }
 }

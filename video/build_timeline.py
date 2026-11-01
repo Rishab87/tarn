@@ -1,8 +1,12 @@
-"""Builds video/timeline.json for render.swift from the demo recordings' scene marks.
+"""Builds video/timeline.json for render.swift: Tarn's 38-second launch video.
 
-Every segment length is a whole number of beats at 120 BPM, so cuts land on the beat of the
-soundtrack (Electro Dreams by Arulo, Mixkit free license; the drop is at 16.0 s in the track and
-the video starts 8 s before it).
+Cut to "Electro Dreams" by Arulo (Mixkit, free licence) at 120 BPM, so every cut lands on a beat
+(a multiple of 0.5 s). The video starts 60 s into the track: the build-up carries the opening words,
+the track goes silent for half a beat at 0:03, and the drop lands on the name at 0:04. The last four
+seconds use the track's own ending (make_video.sh joins the two parts).
+
+Footage is the demo recording (video/footage/main.mov, a 2560x1600 window) and the first-run
+recording (onboarding.mov). Long waits are cut and streaming answers are sped up; the video says so.
 
     python3 video/build_timeline.py
 """
@@ -11,98 +15,105 @@ import json
 from pathlib import Path
 
 HERE = Path(__file__).parent
-TYPE_CPS = 28  # the demo types at 28 characters a second, then pauses 0.5 s before sending
+
+# Camera framings on the window: (x, y) = the point at the frame's centre, 0..1 from the top left;
+# z = zoom, where 1 shows the window's full width (and 0.9/z of its height). The chat column runs
+# from x 0.25 to 0.87, so z <= 1.58 keeps whole lines in frame; closer shots are deliberate close-ups.
+# Answers sit at the bottom of the chat, just above the message box, so chat framings end at the box
+# (y ~0.95): the caption then covers the box, never the answer.
+COMPOSER = (0.55, 0.54, 1.6)        # the centred box on a new chat
+COLUMN = (0.555, 0.66, 1.55)        # the chat column, down to the message box
+COLUMN_HIGH = (0.555, 0.59, 1.55)   # the same, a little higher, for long finished answers
+CARD = (0.555, 0.6, 1.55)           # the "Create Q4_Launch_Sync_Summary.docx?" card and its buttons
+CARD_DOC = (0.42, 0.5, 2.4)         # close-up: the document inside that card
+DONE = (0.5, 0.62, 1.9)             # close-up: "Done! I've saved Q4_Launch_Sync_Summary.docx"
+ASK_EMAIL = (0.645, 0.62, 1.75)     # the sent message with the email screenshot
+ASK_LEASE = (0.65, 0.66, 1.75)      # the sent message with the PDF
+ASK = (0.553, 0.7, 1.62)            # a sent message and the steps under it ("Saved to memory", "Searched the web")
+SETUP = (0.5, 0.47, 1.12)           # first run: "Setting up Tarn for your Mac"
+SETUP_IN = (0.5, 0.47, 1.4)
 
 
-def marks(name: str) -> dict[str, float]:
-    out = {}
-    for line in (HERE / "footage" / f"{name}.marks").read_text().splitlines():
-        t, key = line.split()
-        out[key] = float(t)
-    return out
+def big(*lines, dur=1.0):
+    return {"type": "big", "dur": dur, "lines": list(lines), "drift": 0.025}
 
 
-m = marks("main")
-o = marks("onboarding") if (HERE / "footage" / "onboarding.marks").exists() else None
-
-PROMPTS = {
-    "memory": "I'm a product manager at a fintech startup, and I like short answers in bullet points. Remember that.",
-    "doc": "Turn my meeting notes into a clean summary with decisions and action items with owners, and save it as a Word doc.",
-    "email": "Draft a reply: I'll send them by Thursday 5 pm, and Pune dipped because the store was being renovated in August.",
-    "lease": "I'm about to sign this rental agreement. What should I watch out for? Keep it short.",
-    "web": "Find a good beginner 5K plan online and turn it into a simple 3-days-a-week schedule. Keep it short.",
-    "post": "Write a short LinkedIn post announcing our UPI autopay launch.",
-}
-
-# Camera framing on the 1280x800 window (x, y = centre in 0..1 from top-left, z = zoom).
-COMPOSER_EMPTY = (0.555, 0.53, 1.6)   # the centred box on a new chat
-ANSWER = (0.56, 0.64, 1.4)            # the reply, above the bottom composer
-CARD = (0.6, 0.6, 1.42)               # the "Create … ?" approval card
-
-
-def cams(*keys):
-    return [{"t": t, "x": c[0], "y": c[1], "z": c[2]} for t, c in keys]
-
-
-# When each answer's text starts appearing (after tools and skills), read off the recording.
-TEXT_START = {"email": 126.8, "lease": 141.0, "web": 174.0, "post": 208.0}
-
-
-def scene(name, beats, caption, typing_part=0.4, show_typing=2.6, type_caption=True):
-    """The last `show_typing` seconds of the prompt being typed; the wait for the answer skimmed;
-    the answer arriving at a readable pace; then the finished answer held for a moment."""
-    send = m[f"{name}-send"]
-    typed = len(PROMPTS[name]) / TYPE_CPS + 0.5
-    start = send - min(typed, show_typing)
-    done = m[f"{name}-done"]
-    keys = [[0, start], [typing_part, send + 0.3]]
-    if name in TEXT_START:
-        keys.append([typing_part + 0.08, TEXT_START[name] - 0.3])
-    keys += [[0.84, done + 0.3], [1, done + 1.8]]
-    seg = {
-        "type": "clip", "src": "footage/main.mov", "beats": beats, "caption": caption, "map": keys,
-        "cam": cams((0, COMPOSER_EMPTY), (typing_part, COMPOSER_EMPTY), (typing_part + 0.1, ANSWER), (1, ANSWER)),
-    }
-    if not type_caption:
-        seg["typeCaption"] = False
+def clip(dur, map_, cam, caption=None, src="footage/main.mov", note=True, drift=0.02, captionUntil=None):
+    """map_: [(local s, source s), ...]; cam: [(local s, framing), ...]. Repeat a local time to cut."""
+    seg = {"type": "clip", "dur": dur, "src": src, "drift": drift,
+           "map": [[a, b] for a, b in map_],
+           "cam": [[t, *f] for t, f in cam]}
+    if caption:
+        seg["caption"] = caption
+    if captionUntil is not None:
+        seg["captionUntil"] = captionUntil
+    if note:
+        seg["note"] = True
     return seg
 
 
-send, card, done = m["doc-send"], m["approval"], m["doc-done"]
-doc = {
-    "type": "clip", "src": "footage/main.mov", "beats": 14, "caption": "turns messy notes into a clean doc.",
-    "map": [[0, send - 3.2], [0.3, send + 0.3], [0.42, card + 0.3], [0.74, card + 3.1], [1, done + 1.5]],
-    "cam": cams((0, COMPOSER_EMPTY), (0.3, COMPOSER_EMPTY), (0.4, CARD), (0.74, CARD), (0.84, ANSWER), (1, ANSWER)),
-}
+def hold(a, b, framing):
+    return [(a, framing), (b, framing)]
+
 
 segments = [
-    {"type": "text", "beats": 8, "lines": ["ai for everyone."]},
-    {"type": "text", "beats": 8, "lines": ["it lives on your mac."]},
-    {"type": "logo", "beats": 2},
-    doc,
-    scene("email", 10, "replies to your email."),
-    scene("lease", 10, "reads the fine print."),
-    scene("memory", 6, "remembers how you work.", typing_part=0.5),
-    scene("post", 8, "remembers how you work.", type_caption=False),
-    scene("web", 8, "looks things up."),
+    # 0:00 The build-up: what this is, in three beats.
+    {**big("YOUR MAC"), "instant": True},                             # frame one is the thumbnail
+    big("HAS ITS OWN"),
+    big("AI NOW."),
+    {"type": "black", "dur": 0.5},                                     # the track's half-beat of silence
+    clip(0.25, [(0, 91.0), (0.25, 91.25)], hold(0, 0.25, CARD_DOC), note=False, drift=0),
+    clip(0.25, [(0, 155.0), (0.25, 155.25)], hold(0, 0.25, COLUMN_HIGH), note=False, drift=0),
+    # 0:04 The drop.
+    big("TARN"),
+    # 0:05 Meeting notes in a shared folder -> a formatted Word document, approved before it's written.
+    clip(7.0,
+         [(0, 27.75), (1.0, 28.75),                     # the last second of typing
+          (1.0, 35.3), (1.5, 42.3),                     # it looks in the folder and reads the notes
+          (1.5, 47.8), (3.0, 64.8),                     # the summary streams
+          (3.0, 89.3), (5.0, 92.8),                     # "Create Q4_Launch_Sync_Summary.docx?" -> Allow once
+          (5.0, 100.7), (6.0, 103.4), (7.0, 104.4)],    # "Done! I've saved ..."
+         hold(0, 1.0, COMPOSER) + hold(1.0, 3.0, COLUMN)
+         + hold(3.0, 3.9, CARD_DOC) + [(4.35, CARD), (5.0, CARD)] + hold(5.0, 7.0, DONE),
+         "turns messy notes into a word doc.", captionUntil=3.0),
+    # 0:12 A screenshot of an email -> the reply.
+    clip(4.0,
+         [(0, 110.5), (1.0, 112.5), (1.0, 126.9), (3.0, 130.4), (4.0, 131.4)],
+         hold(0, 1.0, ASK_EMAIL) + hold(1.0, 4.0, COLUMN),
+         "replies to an email from a screenshot."),
+    # 0:16 A rental agreement PDF -> what to watch out for.
+    clip(4.0,
+         [(0, 136.3), (1.0, 140.8), (1.0, 141.0), (3.0, 154.1), (4.0, 155.1)],
+         hold(0, 1.0, ASK_LEASE) + hold(1.0, 3.0, COLUMN) + [(3.4, COLUMN_HIGH), (4.0, COLUMN_HIGH)],
+         "reads the fine print before you sign."),
+    # 0:20 Memory: it saves what you tell it about yourself.
+    clip(4.0,
+         [(0, 9.3), (1.0, 10.3), (1.0, 16.3), (2.0, 19.7), (3.0, 20.9), (4.0, 21.9)],
+         hold(0, 1.0, COMPOSER) + hold(1.0, 4.0, ASK),
+         "remembers how you like things."),
+    # 0:24 The web.
+    clip(4.0,
+         [(0, 166.7), (1.0, 171.2), (1.0, 171.3), (2.75, 191.4), (4.0, 192.65)],
+         hold(0, 1.0, ASK) + hold(1.0, 4.0, COLUMN),
+         "looks things up for you."),
+    # 0:28 First run: it reads the Mac's chip and memory and picks the model. The screen says it all.
+    clip(2.0, [(0, 14.0), (2.0, 20.0)], [(0, SETUP), (0.5, SETUP), (1.6, SETUP_IN), (2.0, SETUP_IN)],
+         src="footage/onboarding.mov", note=False, drift=0),
+    # 0:30 What it isn't.
+    big("NO ACCOUNT."),
+    big("NO SUBSCRIPTION."),
+    big("WORKS OFFLINE."),
+    big("ALL YOURS."),
+    # 0:34 The track's last bars.
+    {"type": "end", "dur": 4.0, "lines": ["free, private ai for your mac."]},
 ]
 
-if o:
-    segments.append({
-        "type": "clip", "src": "footage/onboarding.mov", "beats": 6, "caption": "picks the right ai for your mac.",
-        "map": [[0, o["setup"] + 0.3], [1, o["setup"] + 7.0]],
-        "cam": cams((0, (0.5, 0.5, 1.0)), (1, (0.5, 0.55, 1.18))),
-    })
-else:
-    segments[-1]["beats"] += 6
-
-segments += [
-    {"type": "slams", "beats": 6, "words": ["no account.", "no subscription.", "nothing leaves your mac."]},
-    {"type": "end", "beats": 10, "lines": ["free, private ai for your mac."]},
-]
-
-total = sum(s["beats"] for s in segments)
-assert total == 96, total
-timeline = {"fps": 60, "width": 1920, "height": 1080, "bpm": 120, "segments": segments}
-(HERE / "timeline.json").write_text(json.dumps(timeline, indent=2))
-print(f"timeline.json: {len(segments)} segments, {total} beats = {total / 2:.0f} s")
+total = sum(s["dur"] for s in segments)
+assert abs(total - 38.0) < 1e-6, total
+t = 0.0
+for s in segments:
+    assert abs(t * 2 - round(t * 2)) < 1e-6 or s["dur"] == 0.25, f"cut off the beat at {t}"
+    t += s["dur"]
+timeline = {"fps": 60, "width": 1920, "height": 1080, "segments": segments}
+(HERE / "timeline.json").write_text(json.dumps(timeline, indent=1))
+print(f"timeline.json: {len(segments)} segments, {total:.1f} s")
