@@ -478,9 +478,15 @@ final class AppModel {
     }
 
     /// Folder changes edit chats in the store directly, so the open chat picks up its new folder too.
+    /// Applied without animation: the sidebar animating a chat between "Today" and a folder while
+    /// other rows change (a new chat, typing, a title) left ghost rows drawn over each other.
     private func refreshFolders() {
-        refreshSummaries()
-        if let id = currentId, let chat = store.chats[id], chat.groupId != current?.groupId { current = chat }
+        var t = Transaction()
+        t.disablesAnimations = true
+        withTransaction(t) {
+            refreshSummaries()
+            if let id = currentId, let chat = store.chats[id], chat.groupId != current?.groupId { current = chat }
+        }
     }
 
     func shareFolder() {
@@ -1154,6 +1160,8 @@ final class AppModel {
         var hold: Double?
         /// Put this chat in a sidebar folder with this name, creating the folder if needed.
         var intoFolder: String?
+        /// Type the text into the message box at a human pace before sending, like the demo.
+        var typed: Bool?
     }
 
     /// Plays chat steps from a JSON file, logging each answer, then quits (tests the quit path too).
@@ -1187,6 +1195,10 @@ final class AppModel {
                 mutate(c.id) { $0.folder = folder }
             }
             let files = (step.attach ?? []).compactMap { try? Attachments.read(URL(fileURLWithPath: $0)) }
+            if step.typed == true {
+                await demoType(step.text)
+                drafts[currentId ?? "new"] = ""
+            }
             tourLog("STEP \(n + 1): \(step.text.prefix(60))")
             _ = send(step.text, attachments: files)
             try? await Task.sleep(for: .seconds(0.5))

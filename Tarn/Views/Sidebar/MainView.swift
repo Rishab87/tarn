@@ -81,9 +81,18 @@ struct SidebarView: View {
             .padding(.vertical, 4)
             if search.isEmpty, !model.groups.isEmpty {
                 Section("Folders") {
+                    // Flat rows (folder header, then its chats indented), not a DisclosureGroup: the
+                    // outline view behind a disclosure group left ghost rows when the last chat of a
+                    // date section moved into an open folder.
                     ForEach(model.groups) { g in
-                        FolderRow(group: g, chats: split.inFolder[g.id] ?? [], folders: model.groups,
-                                  rename: { ask(.rename(g)) }, newFolder: { ask(.create(moving: $0)) })
+                        FolderHeader(group: g, rename: { ask(.rename(g)) })
+                        if !g.collapsed {
+                            ForEach(split.inFolder[g.id] ?? [], id: \.inFolderRowID) { c in
+                                ChatRow(chat: c, folders: model.groups, newFolder: { ask(.create(moving: c.id)) })
+                                    .padding(.leading, 18)
+                                    .tag(c.id)
+                            }
+                        }
                     }
                 }
             }
@@ -145,47 +154,47 @@ private enum FolderPrompt {
     }
 }
 
-private struct FolderRow: View {
+/// A folder in the sidebar: click to open or close it, drop chats on it, right-click to rename
+/// or delete.
+private struct FolderHeader: View {
     @Environment(AppModel.self) private var model
     let group: ChatGroup
-    let chats: [ChatSummary]
-    let folders: [ChatGroup]
     let rename: () -> Void
-    /// Opens the new-folder prompt for one of this folder's chats.
-    let newFolder: (String) -> Void
     @State private var confirmDelete = false
     @State private var dropTargeted = false
 
     var body: some View {
-        let expanded = Binding(get: { !group.collapsed }, set: { model.setGroupCollapsed(group.id, !$0) })
-        DisclosureGroup(isExpanded: expanded) {
-            ForEach(chats) { c in
-                ChatRow(chat: c, folders: folders, newFolder: { newFolder(c.id) }).tag(c.id)
-            }
-        } label: {
-            Button { withAnimation { expanded.wrappedValue.toggle() } } label: {
+        Button { model.setGroupCollapsed(group.id, !group.collapsed) } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(group.collapsed ? 0 : 90))
+                    .frame(width: 12)
                 Label(group.name, systemImage: "folder")
                     .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(.rect)
             }
-            .buttonStyle(.plain)
-            .help(group.name)
-            .background(dropTargeted ? Color.water.opacity(0.14) : .clear, in: .rect(cornerRadius: 6))
-            .dropDestination(for: String.self) { ids, _ in
-                model.moveChats(ids, to: group.id)
-            } isTargeted: { dropTargeted = $0 }
-            .contextMenu {
-                Button("Rename") { rename() }
-                Divider()
-                Button("Delete…", role: .destructive) { confirmDelete = true }
-            }
-            .confirmationDialog("Delete “\(group.name)”?", isPresented: $confirmDelete) {
-                Button("Delete folder", role: .destructive) { model.deleteGroup(group.id) }
-            } message: {
-                Text("Its chats move back to your chat list.")
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(.rect)
         }
+        .buttonStyle(.plain)
+        .help(group.name)
+        .accessibilityLabel("\(group.name) folder, \(group.collapsed ? "closed" : "open")")
+        .background(dropTargeted ? Color.water.opacity(0.14) : .clear, in: .rect(cornerRadius: 6))
+        .dropDestination(for: String.self) { ids, _ in
+            model.moveChats(ids, to: group.id)
+        } isTargeted: { dropTargeted = $0 }
+        .contextMenu {
+            Button("Rename") { rename() }
+            Divider()
+            Button("Delete…", role: .destructive) { confirmDelete = true }
+        }
+        .confirmationDialog("Delete “\(group.name)”?", isPresented: $confirmDelete) {
+            Button("Delete folder", role: .destructive) { model.deleteGroup(group.id) }
+        } message: {
+            Text("Its chats move back to your chat list.")
+        }
+        .selectionDisabled()
     }
 }
 
@@ -305,4 +314,8 @@ struct ToastView: View {
                 .accessibilityAddTraits(.updatesFrequently)
         }
     }
+}
+
+private extension ChatSummary {
+    var inFolderRowID: String { "in-folder/" + id }
 }

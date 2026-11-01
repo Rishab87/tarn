@@ -9,7 +9,8 @@ APP=$ROOT/build/DerivedData/Build/Products/Debug/Tarn.app
 rm -f "$PROFILE/tour.log"
 envs=(--env TARN_DATA_DIR="$PROFILE" --env TARN_MODELS_DIR="$MODELS")
 [[ -n ${TARN_LLAMA_SERVER:-} ]] && envs+=(--env TARN_LLAMA_SERVER="$TARN_LLAMA_SERVER")
-open -n -g "${envs[@]}" "$APP" --args -TarnScript "$SCRIPT" -TarnAutoApprove YES ${=EXTRA_ARGS:-}
+bg=(-g); [[ -n ${FOREGROUND:-} ]] && bg=()   # FOREGROUND=1 opens the app in front (with animations)
+open -n $bg "${envs[@]}" "$APP" --args -TarnScript "$SCRIPT" -TarnAutoApprove YES ${=EXTRA_ARGS:-}
 sleep 3
 PID=$(pgrep -n -f "$APP/Contents/MacOS/Tarn")
 seen=0
