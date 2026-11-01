@@ -641,6 +641,9 @@ final class AppModel {
             let sampling = (thinking ? model?.thinkingSampling : nil) ?? model?.sampling
             let maxOutput = min(8192, ctx / 3)
 
+            // Small models sometimes write the requested document into the chat and forget to save
+            // it. When the user asked for a file and none was written, remind the model once.
+            var remindedToSave = false, reminderPending = false
             for round in 0...Self.maxToolRounds {
                 guard let chat = store.chats[chatId] else { return }
                 let tools = round < Self.maxToolRounds ? availableTools(chat) : []
@@ -650,6 +653,10 @@ final class AppModel {
                 let history = Prompt.history(past, keepFull: 2, attachmentChars: Int(Double(ctx) * Prompt.charsPerToken * 0.45))
                 let system = Prompt.system(chat: chat, settings: settings, toolNames: Set(tools.map(\.name)), skills: Skills.enabled(), memories: memories)
                 var messages = Prompt.fit(system: system, history: history, toolsJSONLength: toolsLen, budget: ctx - maxOutput - 256)
+                if reminderPending {
+                    messages.append(["role": "user", "content": "(Note from the app, not the user: you haven’t saved the file yet. Call write_file now with the complete content. Don’t repeat the text in the chat.)"])
+                    reminderPending = false
+                }
 
                 var calls: [Int: (id: String, name: String, args: String)] = [:]
                 var attempt = 0
@@ -686,7 +693,14 @@ final class AppModel {
                     }
                 }
                 engine.markActive()
-                if calls.isEmpty { break }
+                if calls.isEmpty {
+                    if !remindedToSave, round < Self.maxToolRounds - 1, let c = store.chats[chatId], Self.askedForFileButNoneSaved(c, messageId) {
+                        remindedToSave = true
+                        reminderPending = true
+                        continue
+                    }
+                    break
+                }
                 for key in calls.keys.sorted() {
                     try Task.checkCancellation()
                     guard let call = calls[key] else { continue }
@@ -732,6 +746,22 @@ final class AppModel {
 
     /// Titles and memory checks still running after answers finished (scripts wait on these).
     private var afterAnswerJobs = 0
+
+    /// True when the user's message asks to save or create a file in the shared folder and this
+    /// answer hasn't written one.
+    nonisolated static func askedForFileButNoneSaved(_ chat: Chat, _ messageId: String) -> Bool {
+        guard chat.folder != nil, let i = chat.messages.firstIndex(where: { $0.id == messageId }),
+              let user = chat.messages[..<i].last(where: { $0.role == .user }) else { return false }
+        let wrote = chat.messages[i].blocks.contains { if case .tool(let t) = $0 { (t.name == "write_file" || t.name == "edit_file") && t.status == .done } else { false } }
+        return !wrote && wantsFile(user.text)
+    }
+
+    nonisolated static func wantsFile(_ text: String) -> Bool {
+        let t = text.lowercased()
+        if t.firstMatch(of: /\.(docx|md|txt|csv|rtf|json|html)\b/) != nil && t.firstMatch(of: /\b(save|create|write|make|export|put)\b/) != nil { return true }
+        return t.firstMatch(of: /\b(save|create|write|make|export)\b[^.?!]{0,60}\b(file|doc|docx|document|word|note|notes|list|spreadsheet|csv)\b/) != nil
+            && t.firstMatch(of: /\b(save|saving|create|export|file)\b/) != nil
+    }
 
     /// After an answer, quietly saves lasting facts the user shared (like Claude and ChatGPT do).
     /// Skipped when memory is off, when the model already used `remember` this turn, or when the

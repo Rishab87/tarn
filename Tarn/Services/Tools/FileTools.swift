@@ -13,6 +13,14 @@ enum FolderAccess {
     /// Resolves a path inside the shared folder and rejects anything that escapes it,
     /// including through `..` or symlinks that point elsewhere.
     static func inside(_ root: URL, _ path: String, mustExist: Bool) throws -> URL {
+        var path = path
+        // Models often start paths with the shared folder's own name ("Work/notes.docx" when
+        // "Work" is the shared folder). Read those inside the folder unless such a subfolder exists.
+        let name = root.lastPathComponent
+        if !path.hasPrefix("/"), path == name || path.hasPrefix(name + "/"),
+           !FileManager.default.fileExists(atPath: root.appendingPathComponent(name).path) {
+            path = path == name ? "." : String(path.dropFirst(name.count + 1))
+        }
         let target = (path.hasPrefix("/") ? URL(fileURLWithPath: path) : root.appendingPathComponent(path.isEmpty ? "." : path)).standardizedFileURL
         let rootPath = root.standardizedFileURL.path
         guard target.path == rootPath || target.path.hasPrefix(rootPath + "/") else {

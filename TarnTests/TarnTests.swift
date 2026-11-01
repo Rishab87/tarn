@@ -651,6 +651,12 @@ struct DocumentTests {
         #expect(lease.contains("Security deposit: six months of rent"))
         let notes = try await ReadFileTool().run(["path": "notes.docx"], ctxTool)
         #expect(notes.contains("Notes from today"))
+        // The model sometimes starts paths with the shared folder's own name.
+        let folderName = dir.lastPathComponent
+        let viaName = try await ReadFileTool().run(["path": "\(folderName)/notes.docx"], ctxTool)
+        #expect(viaName.contains("Notes from today"))
+        let listed = try await ListFilesTool().run(["path": folderName], ctxTool)
+        #expect(listed.contains("lease.pdf"))
         // Word files are never edited in place (that would drop their formatting).
         await #expect(throws: ToolFailure.self) {
             _ = try await EditFileTool().run(["path": "notes.docx", "old_text": "today", "new_text": "Monday"], ctxTool)
@@ -668,5 +674,18 @@ struct DocumentTests {
         let a = try Attachments.read(url)
         #expect(a.kind == .text)
         #expect(a.text.contains("I build fintech products."))
+    }
+}
+
+@Suite("Save reminder")
+struct SaveReminderTests {
+    @Test func detectsRequestsForFiles() {
+        #expect(AppModel.wantsFile("Turn my notes into a clean summary and save it as a Word doc."))
+        #expect(AppModel.wantsFile("Make a packing list file for it."))
+        #expect(AppModel.wantsFile("Write the plan to plan.md"))
+        #expect(AppModel.wantsFile("Create a document with the action items"))
+        #expect(!AppModel.wantsFile("Write a short LinkedIn post about our launch."))
+        #expect(!AppModel.wantsFile("Summarize this document for me."))
+        #expect(!AppModel.wantsFile("What files are in this folder?"))
     }
 }
