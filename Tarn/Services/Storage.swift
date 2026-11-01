@@ -27,6 +27,8 @@ enum Paths {
     static var settings: URL { data.appendingPathComponent("settings.json") }
     static var modelsState: URL { data.appendingPathComponent("models.json") }
     static var connectors: URL { data.appendingPathComponent("connectors.json") }
+    /// Sidebar folders (`ChatGroup`).
+    static var groups: URL { data.appendingPathComponent("groups.json") }
     static var skillsState: URL { data.appendingPathComponent("skills.json") }
     static var builtInSkills: URL? { Bundle.main.url(forResource: "Skills", withExtension: nil) }
 
@@ -69,18 +71,26 @@ enum JSONFile {
 }
 
 /// One JSON file per chat. Chats without messages live only in memory, so empty "New chat"
-/// entries don't pile up on disk.
+/// entries don't pile up on disk. Sidebar folders live in one groups.json.
 final class ChatStore {
     private(set) var chats: [String: Chat] = [:]
+    /// Sidebar folders, sorted by name.
+    private(set) var groups: [ChatGroup] = []
+    private let dir: URL
+    private let groupsFile: URL
 
-    init() {
-        let files = (try? FileManager.default.contentsOfDirectory(at: Paths.chats, includingPropertiesForKeys: nil)) ?? []
+    /// Tests pass scratch locations; the app uses Tarn's data folder.
+    init(dir: URL = Paths.chats, groupsFile: URL = Paths.groups) {
+        self.dir = dir
+        self.groupsFile = groupsFile
+        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
         for f in files where f.pathExtension == "json" {
             guard var chat = JSONFile.read(Chat.self, from: f), Self.validId(chat.id) else { continue }
             // A chat saved mid-answer (app quit or crashed) shouldn't show a forever-spinning reply.
             for i in chat.messages.indices where chat.messages[i].status == .streaming { chat.messages[i].status = .stopped }
             chats[chat.id] = chat
         }
+        groups = Self.byName(JSONFile.read([ChatGroup].self, from: groupsFile) ?? [])
     }
 
     static func validId(_ id: String) -> Bool {
@@ -101,13 +111,13 @@ final class ChatStore {
     func save(_ chat: Chat, toDisk: Bool = true) {
         chats[chat.id] = chat
         guard toDisk, !chat.messages.isEmpty, Self.validId(chat.id) else { return }
-        try? JSONFile.write(chat, to: Paths.chats.appendingPathComponent("\(chat.id).json"))
+        try? JSONFile.write(chat, to: dir.appendingPathComponent("\(chat.id).json"))
     }
 
     func delete(_ id: String) {
         chats[id] = nil
         guard Self.validId(id) else { return }
-        try? FileManager.default.removeItem(at: Paths.chats.appendingPathComponent("\(id).json"))
+        try? FileManager.default.removeItem(at: dir.appendingPathComponent("\(id).json"))
     }
 
     func deleteAll() {
@@ -124,5 +134,70 @@ final class ChatStore {
             return nil
         }
         return hits.sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.0.updatedAt > $1.0.updatedAt }.map { ChatSummary($0.0) }
+    }
+
+    // MARK: Folders
+
+    @discardableResult
+    func createGroup(_ name: String) -> ChatGroup? {
+        let clean = ChatGroup.cleanName(name)
+        guard !clean.isEmpty else { return nil }
+        let group = ChatGroup(id: newId(), name: clean, createdAt: Date())
+        groups.append(group)
+        saveGroups()
+        return group
+    }
+
+    func renameGroup(_ id: String, _ name: String) {
+        let clean = ChatGroup.cleanName(name)
+        guard !clean.isEmpty, let i = groups.firstIndex(where: { $0.id == id }) else { return }
+        groups[i].name = clean
+        saveGroups()
+    }
+
+    func setGroupCollapsed(_ id: String, _ collapsed: Bool) {
+        guard let i = groups.firstIndex(where: { $0.id == id }), groups[i].collapsed != collapsed else { return }
+        groups[i].collapsed = collapsed
+        saveGroups()
+    }
+
+    /// Deletes only the folder: its chats go back to the main list.
+    func deleteGroup(_ id: String) {
+        groups.removeAll { $0.id == id }
+        saveGroups()
+        for var chat in chats.values where chat.groupId == id {
+            chat.groupId = nil
+            save(chat)
+        }
+    }
+
+    /// Files a chat in a folder, or takes it out with nil. False when nothing changed
+    /// (unknown chat or folder, or already there).
+    @discardableResult
+    func move(_ chatId: String, to groupId: String?) -> Bool {
+        guard var chat = chats[chatId], chat.groupId != groupId,
+              groupId == nil || groups.contains(where: { $0.id == groupId }) else { return false }
+        chat.groupId = groupId
+        save(chat)
+        return true
+    }
+
+    /// Folders from a backup. Merging keeps the folders already here as they are.
+    func importGroups(_ incoming: [ChatGroup], replace: Bool) {
+        if replace { groups = [] }
+        for g in incoming where !groups.contains(where: { $0.id == g.id }) { groups.append(g) }
+        saveGroups()
+    }
+
+    private func saveGroups() {
+        groups = Self.byName(groups)
+        try? JSONFile.write(groups, to: groupsFile)
+    }
+
+    private static func byName(_ groups: [ChatGroup]) -> [ChatGroup] {
+        groups.sorted {
+            let order = $0.name.localizedStandardCompare($1.name)
+            return order == .orderedSame ? $0.createdAt < $1.createdAt : order == .orderedAscending
+        }
     }
 }

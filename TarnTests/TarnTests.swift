@@ -397,3 +397,204 @@ struct ImageTests {
         #expect(Catalog.all.allSatisfy { $0.vision?.sha256.count == 64 })
     }
 }
+
+@Suite("Chat folders")
+struct ChatGroupTests {
+    /// Each test gets its own chats folder and groups.json, so parallel tests never collide.
+    func scratch() throws -> (store: ChatStore, root: URL) {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("tarn-groups-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("chats"), withIntermediateDirectories: true)
+        return (reopen(root), root)
+    }
+
+    /// A fresh store over the same files: what the next launch would see.
+    func reopen(_ root: URL) -> ChatStore {
+        ChatStore(dir: root.appendingPathComponent("chats"), groupsFile: root.appendingPathComponent("groups.json"))
+    }
+
+    func chat(_ id: String, _ title: String, text: String = "hello", updated: Date = Date()) -> Chat {
+        var c = Chat(id: id, title: title, createdAt: updated, updatedAt: updated)
+        c.messages = [Message(id: "m-\(id)", role: .user, createdAt: updated, text: text)]
+        return c
+    }
+
+    @Test func createRenameDelete() throws {
+        let (store, root) = try scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        store.save(chat("a1", "Goa trip"))
+        store.save(chat("b1", "Taxes"))
+
+        #expect(store.createGroup("  \n ") == nil)
+        let work = try #require(store.createGroup("  Work\nstuff  "))
+        #expect(work.name == "Work stuff")
+        store.createGroup("archive")
+        #expect(store.groups.map(\.name) == ["archive", "Work stuff"])
+
+        store.renameGroup(work.id, "Admin")
+        store.renameGroup(work.id, "   ")
+        #expect(store.groups.map(\.name) == ["Admin", "archive"])
+
+        #expect(store.move("a1", to: work.id))
+        #expect(store.move("b1", to: work.id))
+        store.deleteGroup(work.id)
+        #expect(store.groups.map(\.name) == ["archive"])
+        #expect(store.chats.count == 2)
+        #expect(store.chats.values.allSatisfy { $0.groupId == nil })
+
+        // On disk too: the folder is gone and its chats are back in the main list.
+        let next = reopen(root)
+        #expect(next.groups.map(\.name) == ["archive"])
+        #expect(Set(next.summaries.map(\.id)) == ["a1", "b1"])
+        #expect(next.chats.values.allSatisfy { $0.groupId == nil })
+    }
+
+    @Test func moveInAndOut() throws {
+        let (store, root) = try scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        store.save(chat("a1", "Goa trip"))
+        let trips = try #require(store.createGroup("Trips"))
+
+        #expect(store.move("a1", to: trips.id))
+        #expect(!store.move("a1", to: trips.id))
+        #expect(!store.move("a1", to: "no-such-folder"))
+        #expect(!store.move("missing", to: trips.id))
+        #expect(store.chats["a1"]?.groupId == trips.id)
+        #expect(reopen(root).chats["a1"]?.groupId == trips.id)
+
+        #expect(store.move("a1", to: nil))
+        #expect(store.chats["a1"]?.groupId == nil)
+        #expect(reopen(root).chats["a1"]?.groupId == nil)
+    }
+
+    @Test func collapsedStateIsRemembered() throws {
+        let (store, root) = try scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let g = try #require(store.createGroup("Work"))
+        #expect(!g.collapsed)
+        store.setGroupCollapsed(g.id, true)
+        #expect(reopen(root).groups.first?.collapsed == true)
+        store.setGroupCollapsed(g.id, false)
+        #expect(reopen(root).groups.first?.collapsed == false)
+    }
+
+    @Test func oldChatsDecodeWithoutAFolder() throws {
+        // A chat file from before folders existed. `folder` is the shared folder on disk, not a ChatGroup.
+        let json = #"{"createdAt":"2026-10-01T09:00:00Z","folder":"/Users/sam/Trips","id":"old1","messages":[{"blocks":[],"createdAt":"2026-10-01T09:00:00Z","id":"m1","role":"user","text":"Plan Goa"}],"pinned":false,"title":"Goa","updatedAt":"2026-10-01T09:05:00Z"}"#
+        let old = try JSONFile.decoder.decode(Chat.self, from: Data(json.utf8))
+        #expect(old.groupId == nil)
+        #expect(old.folder == "/Users/sam/Trips")
+
+        var filed = old
+        filed.groupId = "g1"
+        let back = try JSONFile.decoder.decode(Chat.self, from: JSONFile.encoder.encode(filed))
+        #expect(back.groupId == "g1")
+        #expect(back.folder == "/Users/sam/Trips")
+
+        // A folder needs an id and a name; the other fields fall back to defaults.
+        let g = try JSONFile.decoder.decode(ChatGroup.self, from: Data(#"{"id":"g1","name":"  Work  ","collapsed":"yes"}"#.utf8))
+        #expect(g.name == "Work")
+        #expect(!g.collapsed)
+        #expect(throws: DecodingError.self) { try JSONFile.decoder.decode(ChatGroup.self, from: Data(#"{"id":"g1","name":"  "}"#.utf8)) }
+        #expect(throws: DecodingError.self) { try JSONFile.decoder.decode(ChatGroup.self, from: Data(#"{"id":"../x","name":"Work"}"#.utf8)) }
+    }
+
+    @Test func searchFindsChatsInFolders() throws {
+        let (store, root) = try scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        store.save(chat("a1", "Trip ideas", text: "Book a beach shack in Goa"))
+        store.save(chat("b1", "Taxes", text: "File my taxes"))
+        let trips = try #require(store.createGroup("Trips"))
+        store.move("a1", to: trips.id)
+
+        #expect(store.search("goa").map(\.id) == ["a1"])
+        #expect(store.search("trip ideas").map(\.id) == ["a1"])
+        #expect(store.search("goa").first?.groupId == trips.id)
+    }
+
+    @MainActor @Test func folderChatsLeaveTheDateList() {
+        let now = Date()
+        var a = chat("a1", "Older", updated: now.addingTimeInterval(-300))
+        var b = chat("b1", "Newest", updated: now)
+        var c = chat("c1", "Pinned", updated: now.addingTimeInterval(-600))
+        let d = chat("d1", "Loose", updated: now.addingTimeInterval(-60))
+        var e = chat("e1", "Folder was deleted", updated: now.addingTimeInterval(-30))
+        a.groupId = "g1"; b.groupId = "g1"; c.groupId = "g1"; c.pinned = true
+        e.groupId = "gone"
+        // Newest first, as ChatStore.summaries returns them.
+        let split = SidebarView.split([b, e, d, a, c].map(ChatSummary.init), groups: [ChatGroup(id: "g1", name: "Trips", createdAt: now)])
+        #expect(split.inFolder["g1"]?.map(\.id) == ["c1", "b1", "a1"])
+        #expect(split.rest.map(\.id) == ["e1", "d1"])
+    }
+
+    /// The actions the sidebar calls. Uses the test scheme's scratch data folder, never a real profile.
+    @MainActor @Test func sidebarActions() throws {
+        try #require(ProcessInfo.processInfo.environment["TARN_DATA_DIR"] != nil)
+        let model = AppModel()
+        let id = "folder-test-\(UUID().uuidString.prefix(8))"
+        model.store.save(chat(id, "Draft"))
+        defer { model.deleteChat(id) }
+        model.openChat(id)
+
+        // "Move to folder ▸ New folder…" with an empty name.
+        model.createGroup("  ", moving: id)
+        let group = try #require(model.groups.first { $0.id == model.store.chats[id]?.groupId })
+        #expect(group.name == "New folder")
+        #expect(model.current?.groupId == group.id)
+        #expect(model.summaries.first { $0.id == id }?.groupId == group.id)
+
+        // Drops: a stray string (say, a file path) is refused; a chat already there doesn't count.
+        #expect(!model.moveChats(["/Users/sam/notes.txt"], to: group.id))
+        #expect(!model.moveChats([id], to: group.id))
+        model.moveChat(id, to: nil)
+        #expect(model.moveChats([id], to: group.id))
+
+        model.deleteGroup(group.id)
+        #expect(!model.groups.contains { $0.id == group.id })
+        #expect(model.store.chats[id] != nil)
+        #expect(model.current?.groupId == nil)
+        #expect(model.summaries.first { $0.id == id }?.groupId == nil)
+    }
+
+    @Test func backupKeepsFolders() throws {
+        let (store, root) = try scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let zip = root.appendingPathComponent("b.zip")
+        let t = Date(timeIntervalSince1970: 1_790_000_000) // whole seconds survive ISO 8601
+        let work = ChatGroup(id: "g1", name: "Work", createdAt: t, collapsed: true)
+        let trips = ChatGroup(id: "g2", name: "Trips", createdAt: t)
+        var filed = chat("a1", "Q3 plan")
+        filed.groupId = "g1"
+        try Backup.export(to: zip, chats: [filed, chat("b1", "Loose")], groups: [trips, work], settings: AppSettings(), connectors: [])
+
+        let back = try Backup.read(zip)
+        #expect(back.groups == [trips, work])
+        #expect(back.chats.first { $0.id == "a1" }?.groupId == "g1")
+        #expect(back.chats.first { $0.id == "b1" }?.groupId == nil)
+
+        // Restoring on a new Mac brings back the folders with their chats in them.
+        for c in back.chats { store.save(c) }
+        store.importGroups(back.groups, replace: true)
+        let next = reopen(root)
+        #expect(next.groups == [trips, work])
+        #expect(next.chats["a1"]?.groupId == "g1")
+
+        // Merging into a Mac that already has folders leaves those as they are.
+        let (mine, mineRoot) = try scratch()
+        defer { try? FileManager.default.removeItem(at: mineRoot) }
+        let office = try #require(mine.createGroup("Office"))
+        mine.importGroups([ChatGroup(id: office.id, name: "Renamed elsewhere", createdAt: t), work, work], replace: false)
+        #expect(reopen(mineRoot).groups.map(\.name) == ["Office", "Work"])
+
+        // Backups from before folders have no groups.json.
+        let oldZip = root.appendingPathComponent("old.zip")
+        let archive = try Archive(url: oldZip, accessMode: .create)
+        let manifest = Data(#"{"format":"tarn-backup","version":1}"#.utf8)
+        let oldChat = try JSONFile.encoder.encode(chat("old1", "Old"))
+        for (path, d) in [("manifest.json", manifest), ("chats/old1.json", oldChat)] {
+            try archive.addEntry(with: path, type: .file, uncompressedSize: Int64(d.count)) { pos, size in d.subdata(in: Int(pos)..<Int(pos) + size) }
+        }
+        let old = try Backup.read(oldZip)
+        #expect(old.groups.isEmpty)
+        #expect(old.chats.map(\.id) == ["old1"])
+    }
+}

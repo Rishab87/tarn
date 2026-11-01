@@ -527,13 +527,13 @@ private struct DataPane: View {
                     Button("Back up…") { model.exportBackup() }
                 } label: {
                     Text("Back up everything")
-                    Text("Saves \(model.summaries.count) chat\(model.summaries.count == 1 ? "" : "s"), your skills, connectors and preferences in one .zip file. AI models aren’t included; Tarn downloads the right one on each Mac. Connector settings can include access keys, so keep the file private.")
+                    Text("Saves \(model.summaries.count) chat\(model.summaries.count == 1 ? "" : "s"), your folders, skills, connectors and preferences in one .zip file. AI models aren’t included; Tarn downloads the right one on each Mac. Connector settings can include access keys, so keep the file private.")
                 }
                 LabeledContent {
                     Button("Restore…") { model.importBackup(replace: false) }
                 } label: {
                     Text("Restore from a backup")
-                    Text("Adds the chats from a Tarn backup. Chats you already have stay. Connectors from the backup arrive switched off.")
+                    Text("Adds the chats and folders from a Tarn backup. Chats you already have stay. Connectors from the backup arrive switched off.")
                 }
                 LabeledContent {
                     Button("Show in Finder") { NSWorkspace.shared.open(Paths.data) }

@@ -29,14 +29,32 @@ struct MainView: View {
 struct SidebarView: View {
     @Environment(AppModel.self) private var model
     let search: String
+    @State private var prompt: FolderPrompt?
+    @State private var folderName = ""
 
-    private var groups: [(String, [ChatSummary])] {
-        let list = search.isEmpty ? model.summaries : model.store.search(search)
-        if !search.isEmpty { return list.isEmpty ? [] : [("Results", list)] }
+    /// A chat in a folder shows only inside it, pinned first, then newest. The rest fill the
+    /// date sections.
+    static func split(_ summaries: [ChatSummary], groups: [ChatGroup]) -> (inFolder: [String: [ChatSummary]], rest: [ChatSummary]) {
+        let ids = Set(groups.map(\.id))
+        var inFolder: [String: [ChatSummary]] = [:]
+        var rest: [ChatSummary] = []
+        for c in summaries {
+            if let g = c.groupId, ids.contains(g) { inFolder[g, default: []].append(c) } else { rest.append(c) }
+        }
+        for (g, chats) in inFolder { inFolder[g] = chats.filter(\.pinned) + chats.filter { !$0.pinned } }
+        return (inFolder, rest)
+    }
+
+    /// Date sections, or one "Results" section while searching (results include chats in folders).
+    private func sections(_ rest: [ChatSummary]) -> [(String, [ChatSummary])] {
+        if !search.isEmpty {
+            let list = model.store.search(search)
+            return list.isEmpty ? [] : [("Results", list)]
+        }
         var out: [(String, [ChatSummary])] = []
-        let pinned = list.filter(\.pinned)
+        let pinned = rest.filter(\.pinned)
         if !pinned.isEmpty { out.append(("Pinned", pinned)) }
-        for c in list where !c.pinned {
+        for c in rest where !c.pinned {
             let label = Fmt.dayGroup(c.updatedAt)
             if let i = out.firstIndex(where: { $0.0 == label }) { out[i].1.append(c) } else { out.append((label, [c])) }
         }
@@ -44,7 +62,11 @@ struct SidebarView: View {
     }
 
     var body: some View {
-        let selection = Binding<String?>(get: { model.currentId }, set: { model.openChat($0) })
+        // nil is ignored: a row can vanish (its folder collapses) without the user picking another
+        // chat. "New chat" is what closes the open one.
+        let selection = Binding<String?>(get: { model.currentId }, set: { if let id = $0 { model.openChat(id) } })
+        let split = Self.split(model.summaries, groups: model.groups)
+        let sections = sections(split.rest)
         List(selection: selection) {
             Button { model.newChat() } label: {
                 Label("New chat", systemImage: "square.and.pencil")
@@ -52,27 +74,128 @@ struct SidebarView: View {
             .buttonStyle(.plain)
             .padding(.vertical, 4)
             .help("New chat (⌘N)")
-            if groups.isEmpty {
+            Button { ask(.create(moving: nil)) } label: {
+                Label("New folder", systemImage: "folder.badge.plus")
+            }
+            .buttonStyle(.plain)
+            .padding(.vertical, 4)
+            if search.isEmpty, !model.groups.isEmpty {
+                Section("Folders") {
+                    ForEach(model.groups) { g in
+                        FolderRow(group: g, chats: split.inFolder[g.id] ?? [], folders: model.groups,
+                                  rename: { ask(.rename(g)) }, newFolder: { ask(.create(moving: $0)) })
+                    }
+                }
+            }
+            if search.isEmpty ? model.summaries.isEmpty : sections.isEmpty {
                 Text(search.isEmpty ? "Your chats will appear here. They’re saved on this Mac only." : "No chats match that.")
                     .foregroundStyle(.secondary)
                     .font(.callout)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.vertical, 6)
             }
-            ForEach(groups, id: \.0) { label, chats in
+            ForEach(sections, id: \.0) { label, chats in
                 Section(label) {
-                    ForEach(chats) { c in ChatRow(chat: c).tag(c.id) }
+                    ForEach(chats) { c in
+                        ChatRow(chat: c, folders: model.groups, newFolder: { ask(.create(moving: c.id)) }).tag(c.id)
+                    }
                 }
             }
         }
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) { SidebarFooter() }
+        .alert(prompt?.title ?? "", isPresented: Binding(get: { prompt != nil }, set: { if !$0 { prompt = nil } }), presenting: prompt) { p in
+            TextField("Name", text: $folderName)
+            Button(p.button) { commit(p) }
+            Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    private func ask(_ p: FolderPrompt) {
+        if case .rename(let g) = p { folderName = g.name } else { folderName = "" }
+        prompt = p
+    }
+
+    private func commit(_ p: FolderPrompt) {
+        switch p {
+        case .create(let chatId): model.createGroup(folderName, moving: chatId)
+        case .rename(let g): model.renameGroup(g.id, folderName)
+        }
+    }
+}
+
+/// The name prompt for a new or renamed folder.
+private enum FolderPrompt {
+    /// `moving`: the chat to file in the new folder, when started from that chat's menu.
+    case create(moving: String?)
+    case rename(ChatGroup)
+
+    var title: String {
+        switch self {
+        case .create: "New folder"
+        case .rename: "Rename folder"
+        }
+    }
+
+    var button: String {
+        switch self {
+        case .create: "Create"
+        case .rename: "Rename"
+        }
+    }
+}
+
+private struct FolderRow: View {
+    @Environment(AppModel.self) private var model
+    let group: ChatGroup
+    let chats: [ChatSummary]
+    let folders: [ChatGroup]
+    let rename: () -> Void
+    /// Opens the new-folder prompt for one of this folder's chats.
+    let newFolder: (String) -> Void
+    @State private var confirmDelete = false
+    @State private var dropTargeted = false
+
+    var body: some View {
+        let expanded = Binding(get: { !group.collapsed }, set: { model.setGroupCollapsed(group.id, !$0) })
+        DisclosureGroup(isExpanded: expanded) {
+            ForEach(chats) { c in
+                ChatRow(chat: c, folders: folders, newFolder: { newFolder(c.id) }).tag(c.id)
+            }
+        } label: {
+            Button { withAnimation { expanded.wrappedValue.toggle() } } label: {
+                Label(group.name, systemImage: "folder")
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .help(group.name)
+            .background(dropTargeted ? Color.water.opacity(0.14) : .clear, in: .rect(cornerRadius: 6))
+            .dropDestination(for: String.self) { ids, _ in
+                model.moveChats(ids, to: group.id)
+            } isTargeted: { dropTargeted = $0 }
+            .contextMenu {
+                Button("Rename") { rename() }
+                Divider()
+                Button("Delete…", role: .destructive) { confirmDelete = true }
+            }
+            .confirmationDialog("Delete “\(group.name)”?", isPresented: $confirmDelete) {
+                Button("Delete folder", role: .destructive) { model.deleteGroup(group.id) }
+            } message: {
+                Text("Its chats move back to your chat list.")
+            }
+        }
     }
 }
 
 private struct ChatRow: View {
     @Environment(AppModel.self) private var model
     let chat: ChatSummary
+    /// Every folder, for "Move to folder".
+    let folders: [ChatGroup]
+    /// Opens the new-folder prompt for this chat.
+    let newFolder: () -> Void
     @State private var renaming = false
     @State private var title = ""
     @State private var confirmDelete = false
@@ -86,11 +209,24 @@ private struct ChatRow: View {
                     .onExitCommand { renaming = false }
             } else {
                 Text(chat.title).lineLimit(1).help(chat.preview.isEmpty ? chat.title : chat.preview)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(.rect)
+                    .draggable(chat.id)
             }
         }
         .contextMenu {
             Button("Rename") { title = chat.title; renaming = true }
             Button(chat.pinned ? "Unpin" : "Pin") { model.togglePin(chat.id) }
+            Menu("Move to folder") {
+                ForEach(folders) { g in
+                    Button(g.name) { model.moveChat(chat.id, to: g.id) }.disabled(g.id == chat.groupId)
+                }
+                if !folders.isEmpty { Divider() }
+                Button("New folder…") { newFolder() }
+            }
+            if folders.contains(where: { $0.id == chat.groupId }) {
+                Button("Remove from folder") { model.moveChat(chat.id, to: nil) }
+            }
             Divider()
             Button("Delete…", role: .destructive) { confirmDelete = true }
         }

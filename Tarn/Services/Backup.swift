@@ -5,6 +5,7 @@ import ZIPFoundation
 //   manifest.json      format and version
 //   settings.json      preferences
 //   chats/<id>.json    one file per conversation
+//   groups.json        sidebar folders (a chat points to its folder by groupId)
 //   skills/<name>/…    skills the user added
 //   connectors.json    connector settings
 // AI models aren't included: they're large, and Tarn downloads the right one for each Mac.
@@ -27,6 +28,7 @@ enum Backup {
     struct Contents {
         var settings: AppSettings?
         var chats: [Chat] = []
+        var groups: [ChatGroup] = []
         var skipped = 0
         var skillFiles: [(path: String, data: Data)] = []
         var connectors: [ConnectorConfig] = []
@@ -35,7 +37,7 @@ enum Backup {
         var attachmentFiles: [(name: String, data: Data)] = []
     }
 
-    static func export(to dest: URL, chats: [Chat], settings: AppSettings, connectors: [ConnectorConfig], memories: [MemoryItem] = []) throws {
+    static func export(to dest: URL, chats: [Chat], groups: [ChatGroup] = [], settings: AppSettings, connectors: [ConnectorConfig], memories: [MemoryItem] = []) throws {
         try? FileManager.default.removeItem(at: dest)
         let archive = try Archive(url: dest, accessMode: .create)
         func add(_ path: String, _ data: Data) throws {
@@ -49,6 +51,7 @@ enum Backup {
         portable.onboarded = false
         try add("settings.json", JSONFile.encoder.encode(portable))
         for c in chats where !c.messages.isEmpty { try add("chats/\(c.id).json", JSONFile.encoder.encode(c)) }
+        try add("groups.json", JSONFile.encoder.encode(groups))
         try add("connectors.json", JSONFile.encoder.encode(connectors))
         try add("memory.json", JSONFile.encoder.encode(memories))
         for c in chats {
@@ -113,6 +116,7 @@ enum Backup {
             let rel = String(path.dropFirst(prefix.count + "skills/".count))
             if let d = data("skills/" + rel) { out.skillFiles.append((rel, d)) }
         }
+        out.groups = data("groups.json").flatMap { try? JSONFile.decoder.decode([ChatGroup].self, from: $0) } ?? []
         out.connectors = data("connectors.json").flatMap { try? JSONFile.decoder.decode([ConnectorConfig].self, from: $0) } ?? []
         out.memories = (data("memory.json").flatMap { try? JSONFile.decoder.decode([MemoryItem].self, from: $0) } ?? [])
             .compactMap { m in MemoryStore.normalize(m.text).map { MemoryItem(id: m.id, text: $0, createdAt: m.createdAt) } }

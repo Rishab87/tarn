@@ -364,6 +364,8 @@ struct Chat: Codable, Equatable, Identifiable {
     var pinned: Bool = false
     /// Folder the user shared with Tarn for this chat.
     var folder: String? = nil
+    /// The sidebar folder (`ChatGroup`) this chat is filed in. Unrelated to `folder`.
+    var groupId: String? = nil
     var messages: [Message] = []
 
     var isAnswering: Bool { messages.contains { $0.role == .assistant && $0.status == .streaming } }
@@ -383,6 +385,7 @@ struct ChatSummary: Equatable, Identifiable {
     var updatedAt: Date
     var pinned: Bool
     var preview: String
+    var groupId: String?
 
     init(_ c: Chat) {
         id = c.id
@@ -390,6 +393,41 @@ struct ChatSummary: Equatable, Identifiable {
         updatedAt = c.updatedAt
         pinned = c.pinned
         preview = c.preview
+        groupId = c.groupId
+    }
+}
+
+/// A sidebar folder that organises chats ("Folders" in the UI). Not to be confused with
+/// `Chat.folder`, a folder on disk that the user shares with one chat.
+struct ChatGroup: Codable, Equatable, Identifiable {
+    var id: String
+    var name: String
+    var createdAt: Date
+    /// Folded up in the sidebar; remembered between launches.
+    var collapsed = false
+
+    static let maxName = 100
+
+    init(id: String, name: String, createdAt: Date, collapsed: Bool = false) {
+        self.id = id; self.name = name; self.createdAt = createdAt; self.collapsed = collapsed
+    }
+
+    /// One trimmed line, capped. Empty when nothing usable is left.
+    static func cleanName(_ raw: String) -> String {
+        let line = raw.split(whereSeparator: \.isNewline).joined(separator: " ").trimmingCharacters(in: .whitespaces)
+        return String(line.prefix(maxName)).trimmingCharacters(in: .whitespaces)
+    }
+
+    // Only id and name are required, so older or hand-edited files still load.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = Self.cleanName(try c.decode(String.self, forKey: .name))
+        guard ChatStore.validId(id), !name.isEmpty else {
+            throw DecodingError.dataCorruptedError(forKey: .id, in: c, debugDescription: "A folder needs a valid id and a name")
+        }
+        createdAt = (try? c.decode(Date.self, forKey: .createdAt)) ?? .distantPast
+        collapsed = (try? c.decode(Bool.self, forKey: .collapsed)) ?? false
     }
 }
 
