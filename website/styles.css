@@ -2,7 +2,6 @@
 
 :root {
   --bg: #f2f2ef;
-  --dot: rgba(0, 0, 0, 0.12);
   --ink: #161616;
   --muted: #6f6f6a;
   --faint: #9b9b95;
@@ -10,17 +9,15 @@
   --line: rgba(0, 0, 0, 0.09);
   --bar: rgba(242, 242, 239, 0.74);
   --accent: #1b7384;
-  --glow: rgba(27, 115, 132, 0.14);
-  --neon: rgba(27, 115, 132, 0);
   --btn-bg: #161616;
   --btn-ink: #fafaf8;
   --shadow: 0 34px 70px -28px rgba(18, 32, 34, 0.32), 0 12px 26px -14px rgba(18, 32, 34, 0.2);
+  --px-k: #1c5862; --px-o: #2d7c89; --px-h: #5aa6b2; --px-w: #e8f7f9; --px-s: #23656f;
   color-scheme: light;
 }
 
 :root[data-theme="dark"] {
   --bg: #0f1011;
-  --dot: rgba(255, 255, 255, 0.075);
   --ink: #ecece9;
   --muted: #9a9c98;
   --faint: #6c6e6b;
@@ -28,43 +25,39 @@
   --line: rgba(255, 255, 255, 0.09);
   --bar: rgba(15, 16, 17, 0.72);
   --accent: #5cc8d6;
-  --glow: rgba(92, 200, 214, 0.16);
-  --neon: rgba(255, 79, 163, 0.09);
   --btn-bg: #ecece9;
   --btn-ink: #121212;
   --shadow: 0 34px 70px -24px rgba(0, 0, 0, 0.7), 0 12px 26px -14px rgba(0, 0, 0, 0.6);
+  --px-k: #3b8994; --px-o: #6bb8c3; --px-h: #9ad3dc; --px-w: #f4fdff; --px-s: #4f9eab;
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root[data-theme="system"] {
     --bg: #0f1011;
-    --dot: rgba(255, 255, 255, 0.075);
-    --ink: #ecece9;
+      --ink: #ecece9;
     --muted: #9a9c98;
     --faint: #6c6e6b;
     --win: #1b1c1e;
     --line: rgba(255, 255, 255, 0.09);
     --bar: rgba(15, 16, 17, 0.72);
     --accent: #5cc8d6;
-    --glow: rgba(92, 200, 214, 0.16);
-    --neon: rgba(255, 79, 163, 0.09);
     --btn-bg: #ecece9;
     --btn-ink: #121212;
     --shadow: 0 34px 70px -24px rgba(0, 0, 0, 0.7), 0 12px 26px -14px rgba(0, 0, 0, 0.6);
+    --px-k: #3b8994; --px-o: #6bb8c3; --px-h: #9ad3dc; --px-w: #f4fdff; --px-s: #4f9eab;
     color-scheme: dark;
   }
 }
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; overflow-x: clip; }
 
 body {
+  position: relative;
   margin: 0;
   background-color: var(--bg);
-  background-image: radial-gradient(var(--dot) 1px, transparent 1.5px);
-  background-size: 22px 22px;
   color: var(--ink);
   font: 16px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Inter, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -112,11 +105,57 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 
 .hero {
   position: relative;
+  isolation: isolate;
   max-width: 1180px;
   margin: 0 auto;
-  padding: 118px 24px 0;
+  padding: 118px 24px var(--land);
   text-align: center;
+  --land: clamp(300px, 30vw, 420px);
 }
+
+/* The wallpaper: a pixel tarn lit by the visitor's own clock (scene.js). It starts under the
+   translucent menu bar and runs down behind the app window, which floats on the lake. script.js
+   sizes it to whole pixels. */
+.scene {
+  position: absolute;
+  z-index: -1;
+  top: -36px;
+  left: calc(50% - 50vw);
+  width: 100vw;
+  height: calc(100% + 36px);
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+/* Below the lake's surface, deep water runs to the bottom of the page (scene.js, renderDeep). */
+.deep {
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+[data-lake] { --px-k: #3b8994; --px-o: #6bb8c3; --px-h: #9ad3dc; --px-w: #f4fdff; --px-s: #4f9eab; }
+[data-lake] .fits p, [data-lake] .water, [data-lake] .foot { color: rgba(241, 239, 232, 0.8); }
+[data-lake] .foot a { color: rgba(241, 239, 232, 0.92); }
+[data-lake] .foot a:hover { color: #fff; }
+[data-lake] .chips li { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.18); color: #f4f2ec; }
+[data-lake] .chips span { color: rgba(241, 239, 232, 0.66); }
+
+/* Text sits on the sky, so its colour follows the scene: ink on a bright dawn or day sky, warm
+   white on dusk, night and on every sky in dark mode. */
+.hero[data-phase] { --scene-ink: #111317; --scene-muted: #1f2630; --scene-faint: #2b333e; --scene-btn: #111317; --scene-btn-ink: #fafaf8; }
+.hero[data-phase="dusk"], .hero[data-phase="night"], .hero[data-phase][data-dark] {
+  --scene-ink: #f7f4ee; --scene-muted: rgba(247, 244, 238, 0.86); --scene-faint: rgba(247, 244, 238, 0.7);
+  --scene-btn: #f7f4ee; --scene-btn-ink: #111317;
+}
+.hero[data-phase] h1 { color: var(--scene-ink); }
+.hero[data-phase] .sub { color: var(--scene-muted); }
+.hero[data-phase] .req { color: var(--scene-faint); }
+.hero[data-phase] .btn { background: var(--scene-btn); color: var(--scene-btn-ink); }
 
 h1 {
   margin: 0 auto 18px;
@@ -176,21 +215,9 @@ h1 {
   position: relative;
   isolation: isolate;
   max-width: 1180px;
-  margin: 76px auto 0;
+  margin: calc(-1 * var(--float)) auto 0;
   padding: 0 24px;
-}
-
-/* Light on water under the window: teal by day, a neon reflection at night. */
-.desk::before {
-  content: "";
-  position: absolute;
-  inset: 18% -6% -14%;
-  z-index: -1;
-  background:
-    radial-gradient(42% 46% at 50% 62%, var(--glow), transparent 72%),
-    radial-gradient(30% 30% at 68% 78%, var(--neon), transparent 70%);
-  filter: blur(14px);
-  pointer-events: none;
+  --float: 110px;
 }
 
 .win {
@@ -265,7 +292,8 @@ h1 {
   font-size: 14.5px;
   color: var(--muted);
 }
-.water svg { flex: none; width: 17px; height: 17px; color: var(--accent); }
+.water .px-drop { flex: none; width: 16px; height: 22px; }
+.px-k { fill: var(--px-k); } .px-o { fill: var(--px-o); } .px-h { fill: var(--px-h); } .px-w { fill: var(--px-w); } .px-s { fill: var(--px-s); }
 .water p { margin: 0; }
 
 .first { max-width: 560px; margin: 34px auto 0; padding: 0 24px; text-align: center; font-size: 14.5px; color: var(--muted); }
@@ -275,6 +303,8 @@ h1 {
 .first[open] summary::after { content: " –"; }
 .first p { margin: 12px 0 0; }
 .first strong { color: var(--ink); font-weight: 500; }
+[data-lake] .first { color: rgba(241, 239, 232, 0.8); }
+[data-lake] .first summary, [data-lake] .first strong { color: #f4f2ec; }
 
 .foot { margin: 112px auto 0; padding: 0 24px 52px; text-align: center; font-size: 13px; color: var(--faint); }
 .foot p { margin: 4px 0; }
@@ -302,6 +332,8 @@ h1 {
 }
 
 @media (max-width: 600px) {
+  .hero { --land: 250px; }
+  .desk { --float: 70px; }
   .menu-left a:not(.brand), .clock { display: none; }
   .sub { font-size: 17px; }
   .win.main { border-radius: 10px; }

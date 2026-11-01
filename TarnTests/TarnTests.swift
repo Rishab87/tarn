@@ -717,3 +717,45 @@ struct DownloadSpeedTests {
     }
 }
 
+@Suite("Pixel touches")
+struct PixelTests {
+    @Test func sceneFollowsTheClock() {
+        func at(_ hour: Int) -> Date { Calendar.current.date(bySettingHour: hour, minute: 30, second: 0, of: Date())! }
+        #expect(PixelTime.phase(at: at(6)) == "dawn")
+        #expect(PixelTime.phase(at: at(12)) == "day")
+        #expect(PixelTime.phase(at: at(18)) == "dusk")
+        #expect(PixelTime.phase(at: at(23)) == "night")
+        #expect(PixelTime.phase(at: at(3)) == "night")
+        #expect(PixelTime.asset("Lake", at: at(18)) == "LakeDusk")
+    }
+
+    @Test func everyTimeOfDayHasItsImages() {
+        for phase in ["Dawn", "Day", "Dusk", "Night"] {
+            for (name, size) in [("Greet\(phase)", CGSize(width: 52, height: 32)), ("Lake\(phase)", CGSize(width: 140, height: 77)), ("Lake\(phase)Dry", CGSize(width: 140, height: 77))] {
+                let image = NSImage(named: name)
+                #expect(image != nil, "\(name) is missing from the asset catalog")
+                #expect(image?.size == size)
+            }
+        }
+    }
+
+    @Test func waterLevelsUpAtMilestones() {
+        #expect(Water.milestone(from: 998.9, to: 1000.0) == 1000)
+        #expect(Water.milestone(from: 1000.0, to: 1001.1) == nil)
+        #expect(Water.milestone(from: 5, to: 6.1) == nil)
+        #expect(Water.level(0).level == 1)
+        #expect(Water.level(500).progress == 0.5)
+        #expect(Water.level(1000).level == 2)
+        #expect(Water.level(1000).next == 10_000)
+        #expect(Water.level(2_000_000).next == nil)
+        #expect(Water.format(999.4) == "999 mL")
+        #expect(Water.format(999.9) == "1.0 L")     // never "1000 mL"
+        #expect(Water.format(1001) == "1.0 L")
+    }
+
+    @Test func dropSpriteRowsLineUp() {
+        #expect(Set(PixelDrop.rows.map(\.count)) == [8])
+        for row in PixelDrop.rows { for ch in row where ch != "." { #expect(PixelDrop.colors[ch] != nil) } }
+    }
+}
+

@@ -57,8 +57,8 @@ private struct EmptyChatView: View {
         let name = model.settings.aboutYou.firstMatch(of: /(?i)(?:my name is|i'm|i am|call me)\s+([A-Z][a-z]+)/).map { String($0.1) }
         VStack(spacing: 0) {
             Spacer(minLength: 40)
-            HStack(spacing: 14) {
-                Mark(size: 36)
+            HStack(spacing: 16) {
+                PixelScene()
                 Text(Fmt.greeting(name: name)).font(.display(42))
             }
             .padding(.bottom, 26)
@@ -88,21 +88,39 @@ private struct EmptyChatView: View {
 
 struct WaterCounter: View {
     @Environment(AppModel.self) private var model
-    @State private var open = false
+    @State private var sparkle = 0
 
     var body: some View {
-        Button { open.toggle() } label: {
+        Button { model.waterOpen.toggle() } label: {
             Label {
                 Text("\(Water.format(model.settings.water.ml)) saved").monospacedDigit()
             } icon: {
-                Image(systemName: "drop.fill").foregroundStyle(Color.water)
+                PixelDrop(sparkle: sparkle)
             }
             .labelStyle(.titleAndIcon)
         }
         .help("Water saved by answering on your Mac")
-        .popover(isPresented: $open, arrowEdge: .bottom) {
+        .onChange(of: model.settings.water.ml) { old, new in
+            guard let milestone = Water.milestone(from: old, to: new) else { return }
+            model.showToast("Level up: \(Water.format(milestone)) of water saved by answering on your Mac.")
+            Task { @MainActor in
+                for _ in 0..<2 {
+                    for f in 1...9 { sparkle = f; try? await Task.sleep(for: .milliseconds(80)) }
+                }
+                sparkle = 0
+            }
+        }
+        .popover(isPresented: Binding(get: { model.waterOpen }, set: { model.waterOpen = $0 }), arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 10) {
                 Text(Water.format(model.settings.water.ml)).font(.display(30))
+                let level = Water.level(model.settings.water.ml)
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 6) {
+                        Text("Level \(level.level)").font(.callout.weight(.semibold))
+                        if let next = level.next { Text("· next at \(Water.format(next))").font(.callout).foregroundStyle(.secondary) }
+                    }
+                    PixelBar(progress: level.progress)
+                }
                 Text("saved across \(model.settings.water.answers.formatted()) answer\(model.settings.water.answers == 1 ? "" : "s") written on your Mac")
                     .foregroundStyle(.secondary)
                 Text(Water.explanation).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)

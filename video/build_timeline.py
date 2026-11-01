@@ -1,12 +1,12 @@
-"""Builds video/timeline.json for render.swift: Tarn's 38-second launch video.
+"""Builds video/timeline.json for render.swift: Tarn's demo video, about 1.5 minutes.
 
-Cut to "Electro Dreams" by Arulo (Mixkit, free licence) at 120 BPM, so every cut lands on a beat
-(a multiple of 0.5 s). The video starts 60 s into the track: the build-up carries the opening words,
-the track goes silent for half a beat at 0:03, and the drop lands on the name at 0:04. The last four
-seconds use the track's own ending (make_video.sh joins the two parts).
+A normal demo, not a motion piece: the whole Mac as recorded (menu bar, desktop, Dock), with a slow
+camera that moves in to read and back out to show the Mac. Where the recording waits on the AI, a
+soft dissolve skips ahead; dissolves start on a beat of the music ("A Lonely Cherry Tree" by Pix,
+~99.4 BPM). Streaming answers play faster than real time, and the video says so while they do.
 
-Footage is the demo recording (video/footage/main.mov, a 2560x1600 window) and the first-run
-recording (onboarding.mov). Long waits are cut and streaming answers are sped up; the video says so.
+Recording: video/footage/main.mov (2940x1912, the whole screen) and main.marks, from
+video/record.sh main … -TarnDemoWindow 1200x750 -TarnScene dusk.
 
     python3 video/build_timeline.py
 """
@@ -15,105 +15,83 @@ import json
 from pathlib import Path
 
 HERE = Path(__file__).parent
+BEAT, FIRST_BEAT = 60 / 99.38, 0.49
 
-# Camera framings on the window: (x, y) = the point at the frame's centre, 0..1 from the top left;
-# z = zoom, where 1 shows the window's full width (and 0.9/z of its height). The chat column runs
-# from x 0.25 to 0.87, so z <= 1.58 keeps whole lines in frame; closer shots are deliberate close-ups.
-# Answers sit at the bottom of the chat, just above the message box, so chat framings end at the box
-# (y ~0.95): the caption then covers the box, never the answer.
-COMPOSER = (0.55, 0.54, 1.6)        # the centred box on a new chat
-COLUMN = (0.555, 0.66, 1.55)        # the chat column, down to the message box
-COLUMN_HIGH = (0.555, 0.59, 1.55)   # the same, a little higher, for long finished answers
-CARD = (0.555, 0.6, 1.55)           # the "Create Q4_Launch_Sync_Summary.docx?" card and its buttons
-CARD_DOC = (0.42, 0.5, 2.4)         # close-up: the document inside that card
-DONE = (0.5, 0.62, 1.9)             # close-up: "Done! I've saved Q4_Launch_Sync_Summary.docx"
-ASK_EMAIL = (0.645, 0.62, 1.75)     # the sent message with the email screenshot
-ASK_LEASE = (0.65, 0.66, 1.75)      # the sent message with the PDF
-ASK = (0.553, 0.7, 1.62)            # a sent message and the steps under it ("Saved to memory", "Searched the web")
-SETUP = (0.5, 0.47, 1.12)           # first run: "Setting up Tarn for your Mac"
-SETUP_IN = (0.5, 0.47, 1.4)
+# Camera framings on the screen: (x, y) = the point at the frame's centre, 0..1 from the top left;
+# z = zoom, where 1 is the whole screen. The window fills the frame at z 1.225; nothing goes past 2.
+WHOLE = (0.5, 0.5, 1.0)
+WINDOW = (0.5, 0.472, 1.225)
+COMPOSER = (0.548, 0.495, 1.65)      # the message box on a new chat, with the greeting above
+LOW = (0.55, 0.65, 1.7)              # a message just sent and the steps under it
+STREAM = (0.55, 0.47, 1.45)          # a long answer
+CARD = (0.553, 0.52, 1.7)            # "Create Q4_Launch_Summary.docx?" and its buttons
+DONE = (0.53, 0.52, 1.75)            # "Done! I've saved …"
+ANSWER = (0.55, 0.47, 1.5)           # a finished answer
+WATER = (0.78, 0.31, 2.0)            # the water counter's popover, top right
 
 
-def big(*lines, dur=1.0):
-    return {"type": "big", "dur": dur, "lines": list(lines), "drift": 0.025}
+def shot(pieces, cam, fade=0.6):
+    """pieces: [(source start, source end, speed), …] played back to back; cam: [(local s, framing)]."""
+    local, keys = 0.0, []
+    for a, b, speed in pieces:
+        keys.append([round(local, 4), a])
+        local += (b - a) / speed
+        keys.append([round(local, 4), b])
+    return {"type": "clip", "src": "footage/main.mov", "dur": local, "map": keys,
+            "cam": [[t, *f] for t, f in cam], "fadeIn": fade}
 
 
-def clip(dur, map_, cam, caption=None, src="footage/main.mov", note=True, drift=0.02, captionUntil=None):
-    """map_: [(local s, source s), ...]; cam: [(local s, framing), ...]. Repeat a local time to cut."""
-    seg = {"type": "clip", "dur": dur, "src": src, "drift": drift,
-           "map": [[a, b] for a, b in map_],
-           "cam": [[t, *f] for t, f in cam]}
-    if caption:
-        seg["caption"] = caption
-    if captionUntil is not None:
-        seg["captionUntil"] = captionUntil
-    if note:
-        seg["note"] = True
-    return seg
+def move(t0, t1, a, b):
+    """Hold framing a until t0, then ease to b by t1."""
+    return [(t0, a), (t1, b)]
 
 
-def hold(a, b, framing):
-    return [(a, framing), (b, framing)]
-
-
+# Times are seconds into this recording (main.marks; answer start times read off the footage).
 segments = [
-    # 0:00 The build-up: what this is, in three beats.
-    {**big("YOUR MAC"), "instant": True},                             # frame one is the thumbnail
-    big("HAS ITS OWN"),
-    big("AI NOW."),
-    {"type": "black", "dur": 0.5},                                     # the track's half-beat of silence
-    clip(0.25, [(0, 91.0), (0.25, 91.25)], hold(0, 0.25, CARD_DOC), note=False, drift=0),
-    clip(0.25, [(0, 155.0), (0.25, 155.25)], hold(0, 0.25, COLUMN_HIGH), note=False, drift=0),
-    # 0:04 The drop.
-    big("TARN"),
-    # 0:05 Meeting notes in a shared folder -> a formatted Word document, approved before it's written.
-    clip(7.0,
-         [(0, 27.75), (1.0, 28.75),                     # the last second of typing
-          (1.0, 35.3), (1.5, 42.3),                     # it looks in the folder and reads the notes
-          (1.5, 47.8), (3.0, 64.8),                     # the summary streams
-          (3.0, 89.3), (5.0, 92.8),                     # "Create Q4_Launch_Sync_Summary.docx?" -> Allow once
-          (5.0, 100.7), (6.0, 103.4), (7.0, 104.4)],    # "Done! I've saved ..."
-         hold(0, 1.0, COMPOSER) + hold(1.0, 3.0, COLUMN)
-         + hold(3.0, 3.9, CARD_DOC) + [(4.35, CARD), (5.0, CARD)] + hold(5.0, 7.0, DONE),
-         "turns messy notes into a word doc.", captionUntil=3.0),
-    # 0:12 A screenshot of an email -> the reply.
-    clip(4.0,
-         [(0, 110.5), (1.0, 112.5), (1.0, 126.9), (3.0, 130.4), (4.0, 131.4)],
-         hold(0, 1.0, ASK_EMAIL) + hold(1.0, 4.0, COLUMN),
-         "replies to an email from a screenshot."),
-    # 0:16 A rental agreement PDF -> what to watch out for.
-    clip(4.0,
-         [(0, 136.3), (1.0, 140.8), (1.0, 141.0), (3.0, 154.1), (4.0, 155.1)],
-         hold(0, 1.0, ASK_LEASE) + hold(1.0, 3.0, COLUMN) + [(3.4, COLUMN_HIGH), (4.0, COLUMN_HIGH)],
-         "reads the fine print before you sign."),
-    # 0:20 Memory: it saves what you tell it about yourself.
-    clip(4.0,
-         [(0, 9.3), (1.0, 10.3), (1.0, 16.3), (2.0, 19.7), (3.0, 20.9), (4.0, 21.9)],
-         hold(0, 1.0, COMPOSER) + hold(1.0, 4.0, ASK),
-         "remembers how you like things."),
-    # 0:24 The web.
-    clip(4.0,
-         [(0, 166.7), (1.0, 171.2), (1.0, 171.3), (2.75, 191.4), (4.0, 192.65)],
-         hold(0, 1.0, ASK) + hold(1.0, 4.0, COLUMN),
-         "looks things up for you."),
-    # 0:28 First run: it reads the Mac's chip and memory and picks the model. The screen says it all.
-    clip(2.0, [(0, 14.0), (2.0, 20.0)], [(0, SETUP), (0.5, SETUP), (1.6, SETUP_IN), (2.0, SETUP_IN)],
-         src="footage/onboarding.mov", note=False, drift=0),
-    # 0:30 What it isn't.
-    big("NO ACCOUNT."),
-    big("NO SUBSCRIPTION."),
-    big("WORKS OFFLINE."),
-    big("ALL YOURS."),
-    # 0:34 The track's last bars.
-    {"type": "end", "dur": 4.0, "lines": ["free, private ai for your mac."]},
+    # The whole Mac, then in to the message box as the first message is typed and sent.
+    shot([(0.9, 9.6, 1.0)], [(0, WHOLE)] + move(2.0, 4.4, WHOLE, COMPOSER) + move(7.7, 9.0, COMPOSER, LOW), fade=0),
+    # It saves the fact to memory, then answers.
+    shot([(13.3, 17.5, 2.1), (17.5, 20.6, 1.0)], [(0, LOW), (5.1, LOW)]),
+    # A shared folder: turn the meeting notes into a Word document.
+    shot([(20.7, 27.4, 1.0)], move(0.0, 2.4, WINDOW, COMPOSER) + [(6.7, COMPOSER)]),
+    shot([(33.6, 41.4, 3.0)], [(0, LOW), (2.6, LOW)]),                       # it looks in the folder, reads the notes
+    shot([(46.5, 60.5, 4.0)], [(0, STREAM), (3.5, STREAM)]),                 # the summary streams
+    shot([(76.4, 81.2, 1.0)], move(0.0, 4.8, CARD, (0.55, 0.51, 1.78))),     # it asks before writing the file
+    shot([(88.3, 93.4, 1.0)], [(0, DONE)] + move(2.9, 5.1, DONE, WHOLE)),    # "Done! I've saved …", out to the Mac
+    # A screenshot of an email: draft the reply.
+    shot([(93.5, 101.0, 1.0)], move(0.6, 3.0, WHOLE, COMPOSER) + move(5.3, 6.6, COMPOSER, LOW) + [(7.5, LOW)]),
+    shot([(118.9, 125.0, 1.4)], [(0, ANSWER), (4.36, ANSWER)]),
+    # A rental agreement PDF: what to watch out for.
+    shot([(124.8, 129.6, 1.0)], move(0.0, 2.2, WINDOW, COMPOSER) + [(4.8, COMPOSER)]),
+    shot([(133.3, 146.0, 2.6), (146.0, 148.0, 1.0)], [(0, ANSWER), (6.9, ANSWER)]),
+    # The web: a beginner 5K plan.
+    shot([(147.8, 152.9, 1.0)], move(0.0, 2.2, WINDOW, COMPOSER) + [(5.1, COMPOSER)]),
+    shot([(157.5, 166.5, 3.0)], [(0, LOW), (3.0, LOW)]),
+    # The plan streams in; that answer tips the water counter past a litre (sparkle, "Level up");
+    # its popover explains the count; then slowly back out to the whole Mac.
+    shot([(166.3, 200.2, 6.0), (200.2, 212.9, 1.0)],
+         [(0, ANSWER), (5.65, ANSWER)] + move(5.65, 7.4, ANSWER, WINDOW) + move(9.2, 10.8, WINDOW, WATER)
+         + move(13.6, 16.6, WATER, WHOLE) + [(18.3, WHOLE)]),
+    {"type": "card", "dur": 6.5, "frames": "card", "fadeIn": 1.2,
+     "lines": ["tarn", "an ai that lives on your mac.", "music: a lonely cherry tree by pix"]},
 ]
 
-total = sum(s["dur"] for s in segments)
-assert abs(total - 38.0) < 1e-6, total
+# Start every dissolve on a beat: stretch or squeeze the shot before it a touch (under 0.31 s).
 t = 0.0
-for s in segments:
-    assert abs(t * 2 - round(t * 2)) < 1e-6 or s["dur"] == 0.25, f"cut off the beat at {t}"
-    t += s["dur"]
-timeline = {"fps": 60, "width": 1920, "height": 1080, "segments": segments}
+for i, seg in enumerate(segments):
+    if i + 1 < len(segments) and segments[i + 1].get("fadeIn") and seg["type"] == "clip":
+        end = t + seg["dur"]
+        beat = FIRST_BEAT + round((end - FIRST_BEAT) / BEAT) * BEAT
+        if abs(beat - end) < 0.31:
+            scale = (beat - t) / seg["dur"]
+            seg["map"] = [[round(k[0] * scale, 4), k[1]] for k in seg["map"]]
+            seg["cam"] = [[round(k[0] * scale, 4), *k[1:]] for k in seg["cam"]]
+            seg["dur"] = beat - t
+    t += seg["dur"]
+
+for seg in segments:
+    seg["dur"] = round(seg["dur"], 4)
+total = sum(s["dur"] for s in segments)
+timeline = {"fps": 60, "width": 1848, "height": 1200, "fadeIn": 1.2, "fadeOut": 1.2, "segments": segments}
 (HERE / "timeline.json").write_text(json.dumps(timeline, indent=1))
 print(f"timeline.json: {len(segments)} segments, {total:.1f} s")

@@ -25,6 +25,7 @@
   <script>try { var t = localStorage.getItem('tarn-theme'); if (t) document.documentElement.dataset.theme = t } catch (e) {}</script>
 </head>
 <body>
+  <canvas class="deep" aria-hidden="true"></canvas>
   <header class="menubar">
     <nav class="menu-left" aria-label="Site">
       <a class="brand" href="/" aria-label="Tarn home">
@@ -48,6 +49,7 @@
 
   <main>
     <section class="hero">
+      <canvas class="scene" aria-hidden="true"></canvas>
       <h1>an ai that lives on your&nbsp;mac.</h1>
       <p class="sub">private, free, and it works offline. no account.</p>
       <a class="btn" href="/download/Tarn.dmg" data-download>download for mac</a>
@@ -104,20 +106,22 @@
     </section>
 
     <section class="water">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2c3.6 4.4 6 7.7 6 10.6a6 6 0 0 1-12 0c0-2.9 2.4-6.2 6-10.6z" fill="currentColor"/></svg>
+      <svg class="px-drop" viewBox="0 0 8 11" aria-hidden="true" shape-rendering="crispEdges"><path class="px-k" d="M3 0h1v1h-1zM4 0h1v1h-1zM2 1h1v1h-1zM5 1h1v1h-1zM2 2h1v1h-1zM5 2h1v1h-1zM1 3h1v1h-1zM6 3h1v1h-1zM1 4h1v1h-1zM6 4h1v1h-1zM0 5h1v1h-1zM7 5h1v1h-1zM0 6h1v1h-1zM7 6h1v1h-1zM0 7h1v1h-1zM7 7h1v1h-1zM0 8h1v1h-1zM7 8h1v1h-1zM1 9h1v1h-1zM6 9h1v1h-1zM2 10h1v1h-1zM3 10h1v1h-1zM4 10h1v1h-1zM5 10h1v1h-1z"/><path class="px-o" d="M3 1h1v1h-1zM4 1h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM5 4h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1zM4 5h1v1h-1zM5 5h1v1h-1zM2 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM1 7h1v1h-1zM2 7h1v1h-1zM3 7h1v1h-1zM4 7h1v1h-1zM5 7h1v1h-1zM1 8h1v1h-1zM2 8h1v1h-1zM3 8h1v1h-1zM4 8h1v1h-1z"/><path class="px-w" d="M2 3h1v1h-1z"/><path class="px-h" d="M2 4h1v1h-1zM1 5h1v1h-1zM1 6h1v1h-1z"/><path class="px-s" d="M6 5h1v1h-1zM6 6h1v1h-1zM6 7h1v1h-1zM5 8h1v1h-1zM6 8h1v1h-1zM2 9h1v1h-1zM3 9h1v1h-1zM4 9h1v1h-1zM5 9h1v1h-1z"/></svg>
       <p>every answer here is one a data center didn’t write. tarn counts the water you save.</p>
     </section>
 
     <details class="first">
       <summary>opening it the first time?</summary>
-      <p>tarn isn’t notarized by apple yet, so macos asks first. open tarn, click done, then go to system settings → privacy &amp; security and click <strong>open anyway</strong>. after that it opens normally.</p>
+      <p>apple is still checking this version, so macos asks first. open tarn, click done, then go to system settings → privacy &amp; security and click <strong>open anyway</strong>. after that it opens normally.</p>
     </details>
+
   </main>
 
   <footer class="foot">
     <p>free and open source, mit license. <a href="https://github.com/Rishab87/tarn">source</a> <a href="https://github.com/Rishab87/tarn/issues">report a problem</a> <a href="/privacy">privacy</a></p>
     <p>runs on <a href="https://github.com/ggml-org/llama.cpp">llama.cpp</a> with qwen models.</p>
   </footer>
+  <script src="/scene.js"></script>
   <script src="/script.js"></script>
 </body>
 </html>

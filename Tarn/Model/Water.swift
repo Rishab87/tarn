@@ -18,8 +18,25 @@ enum Water {
         ("Li, Yang, Islam & Ren, “Making AI Less Thirsty” (UC Riverside)", URL(string: "https://arxiv.org/abs/2304.03271")!),
     ]
 
+    /// Milestones that level the counter up, with a little sparkle: 1 L, 10 L, 100 L, 1,000 L.
+    static let milestones: [Double] = [1_000, 10_000, 100_000, 1_000_000]
+
+    /// The milestone passed when the total goes from `old` to `new` mL, if any.
+    static func milestone(from old: Double, to new: Double) -> Double? {
+        milestones.last { old < $0 && new >= $0 }
+    }
+
+    /// The counter's level (1 before the first milestone) and how far it is to the next one.
+    static func level(_ ml: Double) -> (level: Int, next: Double?, progress: Double) {
+        let passed = milestones.filter { ml >= $0 }.count
+        guard passed < milestones.count else { return (passed + 1, nil, 1) }
+        let previous = passed == 0 ? 0 : milestones[passed - 1], next = milestones[passed]
+        return (passed + 1, next, max(0, min(1, (ml - previous) / (next - previous))))
+    }
+
     static func format(_ ml: Double) -> String {
-        if ml < 1000 { return "\(Int(ml.rounded())) mL" }
+        // Below 999.5 mL; anything that would round to "1000 mL" reads as a litre.
+        if ml < 999.5 { return "\(Int(ml.rounded())) mL" }
         let l = ml / 1000
         if l < 100 { return String(format: "%.1f L", l) }
         return "\(Int(l.rounded()).formatted()) L"

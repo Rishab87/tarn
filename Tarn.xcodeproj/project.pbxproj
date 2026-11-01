@@ -30,6 +30,7 @@
 		7A7EF5E12F13D24E276F843C /* libggml-rpc.0.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = B6C898566B0856A41ABDCAF6 /* libggml-rpc.0.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		7D396AF67CCDF01A73494E42 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = C1D829993A860A66CAE02AEF /* ZIPFoundation */; };
 		7E0F85484956BEF4F92DA6B6 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AA617D9FBC5C8E427D7F234 /* ChatView.swift */; };
+		82DADDFF94AAD397C8448293 /* Pixel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E392F2B6449A128B26063E7B /* Pixel.swift */; };
 		832276F4BF1F93EDCBCE18DD /* libllama-server-impl.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 1A857B3265501C5E4692EEA6 /* libllama-server-impl.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		839C83F7919B6DEA1E4185D0 /* llama-server in CopyFiles */ = {isa = PBXBuildFile; fileRef = 414408E1E1194B510C144284 /* llama-server */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		848398179D1D40920A0CF64E /* libmtmd.0.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 6F706B41019BF6EC84432EBE /* libmtmd.0.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
@@ -134,6 +135,7 @@
 		CE8220DD4C4F5B7F430F118E /* WebTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebTools.swift; sourceTree = "<group>"; };
 		CF5AFD6D96B13351952D34C5 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		D8D04A7808A406D066038A31 /* Memory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Memory.swift; sourceTree = "<group>"; };
+		E392F2B6449A128B26063E7B /* Pixel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pixel.swift; sourceTree = "<group>"; };
 		E973F4B3B78706B835E122D8 /* Backup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backup.swift; sourceTree = "<group>"; };
 		EB21C46B3A014368C3CA0FE6 /* WordDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordDocument.swift; sourceTree = "<group>"; };
 		EBF8BC24B9AEDD82BCCC30D7 /* Types.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Types.swift; sourceTree = "<group>"; };
@@ -215,6 +217,7 @@
 		5351D1D7CEF0F6F2AACA600F /* Common */ = {
 			isa = PBXGroup;
 			children = (
+				E392F2B6449A128B26063E7B /* Pixel.swift */,
 				CF5AFD6D96B13351952D34C5 /* Theme.swift */,
 			);
 			path = Common;
@@ -458,6 +461,7 @@
 				5F699E854F99760DB67B7A1D /* MainView.swift in Sources */,
 				A19F2B6A47F7545B86CE9CAE /* Memory.swift in Sources */,
 				B3928B457EA47D010CB2C69E /* OnboardingView.swift in Sources */,
+				82DADDFF94AAD397C8448293 /* Pixel.swift in Sources */,
 				46FBF9AAF784601A63A19489 /* Prompt.swift in Sources */,
 				85BEB2E81EA24919A3274B78 /* SettingsView.swift in Sources */,
 				66DFF49807775D809888CA79 /* Skills.swift in Sources */,
@@ -527,7 +531,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -595,7 +599,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;

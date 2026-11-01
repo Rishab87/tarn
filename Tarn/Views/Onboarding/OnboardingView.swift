@@ -23,7 +23,7 @@ private struct Welcome: View {
     var next: () -> Void
     var body: some View {
         VStack(spacing: 0) {
-            TarnScene(level: 1).frame(maxWidth: 420).padding(.bottom, 30)
+            PixelLake(level: 1).frame(maxWidth: 420).padding(.bottom, 30)
             Text("An AI that lives on your Mac")
                 .font(.display(44))
                 .multilineTextAlignment(.center)
@@ -111,7 +111,7 @@ private struct Setup: View {
             } else if model.picks.recommended == nil {
                 NoticeView(title: "Tarn needs more memory", text: "Tarn needs a Mac with at least 8 GB of memory to run its AI without slowing everything else down.")
             } else {
-                TarnScene(level: level).frame(maxWidth: 400).padding(.bottom, 24)
+                PixelLake(level: level).frame(maxWidth: 420).padding(.bottom, 24)
                 Text(ready ? "Tarn is ready" : "Setting up Tarn for your Mac")
                     .font(.display(40))
                     .padding(.bottom, 10)

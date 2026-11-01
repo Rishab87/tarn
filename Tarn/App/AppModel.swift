@@ -31,6 +31,8 @@ final class AppModel {
     var skills: [Skill] = []
     var memories: [MemoryItem] = []
     var memoryAlert: MemoryAlert?
+    /// The water counter's popover (the toolbar button opens it; the demo recording does too).
+    var waterOpen = false
     var toast: Toast?
     var drafts: [String: String] = [:]
     var searchOpen = false
@@ -361,7 +363,8 @@ final class AppModel {
             } else {
                 try? await Task.sleep(for: .seconds(3))
             }
-            guard MemoryWatcher.level() >= 2, memoryAlert == nil else { return }
+            // Not during a scripted demo recording (-TarnDemo): the take would be ruined.
+            guard MemoryWatcher.level() >= 2, memoryAlert == nil, UserDefaults.standard.string(forKey: "TarnDemo") == nil else { return }
             let pick = [picks.recommended, picks.lighter].compactMap { $0 }.first { $0.model.id == id }
             memoryAlert = MemoryAlert(critical: critical || MemoryWatcher.level() >= 4, onLighter: picks.lighter == nil || picks.lighter?.model.id == id,
                                       engineGB: pick.map { (Double($0.footprintBytes) / 1e8).rounded() / 10 })
@@ -1265,11 +1268,14 @@ final class AppModel {
     }
 
     /// Pins the main window to a fixed frame above other windows so the screen recorder can
-    /// capture a known rectangle, and reports that rectangle (top-left origin, points).
+    /// capture a known rectangle, and reports that rectangle (top-left origin, points). The window
+    /// sits centred between the menu bar and the Dock; `-TarnDemoWindow 1200x750` sets its size.
     private func pinWindowForRecording() {
         guard let w = NSApp.windows.first(where: { $0.isVisible && $0.frame.width > 700 }), let screen = w.screen ?? NSScreen.main else { return }
-        let size = NSSize(width: 1280, height: 800)
-        let origin = NSPoint(x: screen.frame.midX - size.width / 2, y: screen.frame.midY - size.height / 2)
+        let wanted = (UserDefaults.standard.string(forKey: "TarnDemoWindow") ?? "1280x800").split(separator: "x").compactMap { Double($0) }
+        let size = wanted.count == 2 ? NSSize(width: wanted[0], height: wanted[1]) : NSSize(width: 1280, height: 800)
+        let area = screen.visibleFrame
+        let origin = NSPoint(x: area.midX - size.width / 2, y: area.midY - size.height / 2)
         w.setFrame(NSRect(origin: origin, size: size), display: true)
         w.level = .floating
         w.makeKeyAndOrderFront(nil)
@@ -1295,8 +1301,10 @@ final class AppModel {
         drafts[currentId ?? "new"] = ""
         _ = send(text, attachments: attach)
         try? await Task.sleep(for: .seconds(0.4))
+        let before = settings.water.ml
         _ = await waitUntil(600) { !isAnswering(currentId) }
         mark("\(scene)-done")
+        if Water.milestone(from: before, to: settings.water.ml) != nil { mark("levelup") }
         try? await Task.sleep(for: .seconds(2))
     }
 
@@ -1353,9 +1361,10 @@ final class AppModel {
             await demoAsk("I'm about to sign this rental agreement. What should I watch out for? Keep it short.", attach: attach("TarnDemoPDF"), scene: "lease")
             newChat()
             await demoAsk("Find a good beginner 5K plan online and turn it into a simple 3-days-a-week schedule. Keep it short.", scene: "web")
-            newChat()
-            await demoAsk("Write a short LinkedIn post announcing our UPI autopay launch.", scene: "post")
-            fileIntoWork()
+            try? await Task.sleep(for: .seconds(1.5))
+            mark("water"); waterOpen = true
+            try? await Task.sleep(for: .seconds(7))
+            waterOpen = false; mark("water-closed")
             try? await Task.sleep(for: .seconds(2))
         }
         mark("end")
