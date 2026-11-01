@@ -19,3 +19,4 @@ video/out/
 video/render
 video/timeline.json
 video/music/
+website/media/*.mp4
