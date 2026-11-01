@@ -6,7 +6,8 @@
 #
 #   scripts/release.sh
 #
-# Output: build/release/Tarn.app and build/release/Tarn.dmg (plus the notary logs).
+# Output: build/release/Tarn.app and build/release/Tarn.dmg (plus the notary logs), or RELEASE_OUT.
+# Then scripts/publish.sh puts it out: GitHub release with the update feed, and the website.
 # Needs:  Xcode, xcodegen, Engine/llama (python3 scripts/fetch_llama.py), the Developer ID
 #         Application certificate in the login keychain, and notarytool credentials saved as the
 #         keychain profile below (xcrun notarytool store-credentials tarn-notary ...).
@@ -20,8 +21,9 @@ TEAM_ID="QMYVK5D735"
 NOTARY_PROFILE="tarn-notary"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DERIVED="$ROOT/build/DerivedData-release"
-OUT="$ROOT/build/release"
+# RELEASE_OUT and RELEASE_DERIVED let two releases build side by side (one can still be waiting on Apple).
+DERIVED="${RELEASE_DERIVED:-$ROOT/build/DerivedData-release}"
+OUT="${RELEASE_OUT:-$ROOT/build/release}"
 APP="$OUT/Tarn.app"
 DMG="$OUT/Tarn.dmg"
 ENTITLEMENTS="$ROOT/Tarn/Tarn.entitlements"
@@ -47,14 +49,16 @@ notarize() {
   case $status in
     Accepted)
       # Accepted uploads can still carry warnings: keep the log and show them.
-      xcrun notarytool log "$id" --keychain-profile "$NOTARY_PROFILE" "$OUT/notary-$label.json" >/dev/null
-      jq -r '.issues // [] | .[] | "notary \(.severity): \(.path) \(.message)"' "$OUT/notary-$label.json"
+      if xcrun notarytool log "$id" --keychain-profile "$NOTARY_PROFILE" "$OUT/notary-$label.json" >/dev/null; then
+        jq -r '.issues // [] | .[] | "notary \(.severity): \(.path) \(.message)"' "$OUT/notary-$label.json"
+      fi
       ;;
     Invalid|Rejected)
       xcrun notarytool log "$id" --keychain-profile "$NOTARY_PROFILE" >&2
       die "notarization of $label: $status (log above)"
       ;;
     *)
+      # A new team's first submissions can stay "In Progress" for a day or more.
       die "notarization of $label has not finished (status: ${status:-unknown}); check it with: xcrun notarytool info $id --keychain-profile $NOTARY_PROFILE"
       ;;
   esac
@@ -78,11 +82,11 @@ step "Preflight"
 command -v xcodegen >/dev/null || die "xcodegen not found; run: brew install xcodegen"
 [[ $(security find-identity -v -p codesigning) == *"\"$IDENTITY\""* ]] || die "signing identity not in the keychain: $IDENTITY"
 xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null || die "notary keychain profile '$NOTARY_PROFILE' does not work"
-echo "commit $(git describe --always --dirty 2>/dev/null || echo unknown)"
 
 step "Building (Release)"
 # project.yml is the source of truth (the version numbers live there), so regenerate the project.
 xcodegen generate --quiet
+echo "commit $(git describe --always --dirty 2>/dev/null || echo unknown)"
 rm -rf "$OUT"
 mkdir -p "$OUT"
 # Clean build, so files deleted from the source tree can't linger in the bundle. Xcode signs ad hoc

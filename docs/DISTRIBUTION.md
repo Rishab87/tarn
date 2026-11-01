@@ -28,14 +28,27 @@ AI models never count against this: the app downloads them from Hugging Face.
 - **Alternative to GitHub:** Cloudflare R2 has 10 GB free and free egress. Use a custom domain, because `r2.dev` URLs are rate-limited.
 - Download button link that always points to the newest release: `https://github.com/Rishab87/tarn-releases/releases/latest/download/Tarn.dmg`
 
-## Required: Apple Developer ID + notarization
+## Releasing a version
 
-- An unsigned or un-notarized download is blocked by Gatekeeper.
-- Since macOS Sequoia, the Control-click "Open" bypass is gone. Users would have to dig through System Settings, and most won't.
-- Your existing Apple Developer membership ($99/yr, already paid for TerraDex) covers this.
-- What you need:
-  - A **Developer ID Application** certificate. Make it in Xcode → Settings → Accounts → Manage Certificates → + → Developer ID Application. Only the account holder can do this, which is you.
-  - An App Store Connect API key (or an app-specific password) for `notarytool`.
+Two commands, on the Mac that holds the Developer ID certificate and the update-signing key:
+
+1. Bump `CURRENT_PROJECT_VERSION` (and `MARKETING_VERSION` if you like) in `project.yml`.
+2. `scripts/release.sh`
+   - Builds Release.
+   - Signs everything with the Developer ID "Rishab Kumar Jha (QMYVK5D735)" and the hardened runtime.
+   - Notarizes and staples the app, then the DMG.
+   - Checks it with Gatekeeper.
+   - Apple's check usually takes minutes; a new account's first submissions can take hours.
+3. `scripts/publish.sh "What's new, in one line"`
+   - Signs the DMG for Sparkle.
+   - Writes `appcast.xml` and creates the GitHub release (`v<version>-<build>`) with the DMG and the feed.
+   - Copies the DMG to the website and deploys it.
+   - Checks that the live feed and the live download match.
+
+Needs:
+- The Developer ID Application certificate in the login keychain.
+- Notary credentials saved as the keychain profile `tarn-notary` (`xcrun notarytool store-credentials`).
+- The Sparkle update key in the login keychain. Sparkle's `generate_keys` made it, and the public half is `TARN_ED_PUBLIC_KEY` in `project.yml`. **Keep the backup** of the private half (`generate_keys -x file`) in a password manager. Without it you can't ship updates to existing users; on a new Mac, `generate_keys -f file` imports it.
 
 ## How updates reach users (Sparkle 2)
 
@@ -50,7 +63,7 @@ AI models never count against this: the app downloads them from Hugging Face.
    - zip the app, sign the zip with the EdDSA key, add an `<item>` to `appcast.xml`;
    - upload the DMG, zip and appcast to a new GitHub release.
 
-The release script comes in the distribution step. The EdDSA private key will be generated into your login Keychain. **Back it up**: losing it means you can't ship updates to existing users without a key-rotation release.
+The feed is the `appcast.xml` on the newest GitHub release (`TARN_FEED_URL` in `project.yml`); only Release builds carry it.
 
 **New models ship the same way.** Add the model to `scripts/catalog.source.json`, run `python3 scripts/build_catalog.py`, and release. On next launch, Macs where the new model is the better pick see "There's a smarter AI for your Mac". Fixes to the same model file (new SHA-256 on Hugging Face) show "An improved version of your AI is available".
 

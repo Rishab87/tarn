@@ -29,7 +29,7 @@ Tarn is a native macOS app that makes local AI simple for anyone. When you first
 
 ## Install
 
-Download Tarn from [tarn-ai.vercel.app](https://tarn-ai.vercel.app), or build it yourself (below). Builds aren't notarized yet, so the first launch needs one extra step: **System Settings → Privacy & Security → Open Anyway**.
+Download Tarn from [tarn-ai.vercel.app](https://tarn-ai.vercel.app) or the [latest release](https://github.com/Rishab87/tarn/releases/latest), or build it yourself (below). Releases are signed with a Developer ID and notarized by Apple, so Tarn opens like any other app, and it updates itself: it checks for a new version each time it opens and installs it when you quit.
 
 ## Build from source
 

@@ -296,16 +296,6 @@ h1 {
 .px-k { fill: var(--px-k); } .px-o { fill: var(--px-o); } .px-h { fill: var(--px-h); } .px-w { fill: var(--px-w); } .px-s { fill: var(--px-s); }
 .water p { margin: 0; }
 
-.first { max-width: 560px; margin: 34px auto 0; padding: 0 24px; text-align: center; font-size: 14.5px; color: var(--muted); }
-.first summary { display: inline; cursor: pointer; color: var(--ink); list-style: none; }
-.first summary::-webkit-details-marker { display: none; }
-.first summary::after { content: " +"; color: var(--faint); }
-.first[open] summary::after { content: " –"; }
-.first p { margin: 12px 0 0; }
-.first strong { color: var(--ink); font-weight: 500; }
-[data-lake] .first { color: rgba(241, 239, 232, 0.8); }
-[data-lake] .first summary, [data-lake] .first strong { color: #f4f2ec; }
-
 .foot { margin: 112px auto 0; padding: 0 24px 52px; text-align: center; font-size: 13px; color: var(--faint); }
 .foot p { margin: 4px 0; }
 .foot a { margin: 0 5px; color: var(--muted); text-decoration: none; }

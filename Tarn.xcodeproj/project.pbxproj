@@ -531,7 +531,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -599,7 +599,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 7;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -684,6 +684,8 @@
 				PRODUCT_BUNDLE_IDENTIFIER = app.tarn.mac;
 				PRODUCT_NAME = Tarn;
 				SDKROOT = macosx;
+				TARN_ED_PUBLIC_KEY = "Ask4Q+CwJbQpepF0z44bHur7am+HPTEn/OsEh3JDHGE=";
+				TARN_FEED_URL = "https://github.com/Rishab87/tarn/releases/latest/download/appcast.xml";
 			};
 			name = Release;
 		};
@@ -707,6 +709,8 @@
 				PRODUCT_BUNDLE_IDENTIFIER = app.tarn.mac;
 				PRODUCT_NAME = Tarn;
 				SDKROOT = macosx;
+				TARN_ED_PUBLIC_KEY = "";
+				TARN_FEED_URL = "";
 			};
 			name = Debug;
 		};
