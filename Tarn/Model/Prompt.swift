@@ -24,7 +24,9 @@ enum Prompt {
             lines.append("\nYou can search the web. Do it for anything recent, local or changeable (news, prices, weather, opening hours, sports) and for facts you are unsure of. Mention the websites you used as Markdown links.")
         }
         if let folder = chat.folder {
-            lines.append("\nThe user shared the folder “\((folder as NSString).lastPathComponent)” (\(folder)) with you. You can list, read and search files there, and, with the user’s approval, create or edit files and run terminal commands inside it. For multi-step tasks: look around first, make a short plan, do the work step by step, then check the result.")
+            // Only the folder's name: tools use paths inside it, and the full path would show the
+            // user's account name (/Users/<name>/…), which the model then guesses as their name.
+            lines.append("\nThe user shared the folder “\((folder as NSString).lastPathComponent)” with you. You can list, read and search files there, and, with the user’s approval, create or edit files and run terminal commands inside it. For multi-step tasks: look around first, make a short plan, do the work step by step, then check the result. When the user asks you to save, create or write a file or document, create it with write_file rather than only showing the text in the chat; use a .docx path when they ask for a Word document.")
         }
         if !skills.isEmpty {
             lines.append("\nYou have skills: packaged instructions for specific kinds of tasks. When a request matches one, call use_skill with its name before you start, then follow what it says.")

@@ -1292,33 +1292,41 @@ final class AppModel {
             try? await Task.sleep(for: .seconds(4))
         } else {
             _ = await waitUntil(180) { if case .ready = engineState { true } else { false } }
-            newChat(); mark("empty"); try? await Task.sleep(for: .seconds(2.5))
-            await demoAsk("Plan a relaxed weekend in Jaipur for two. Keep it short, with a rough budget in rupees.", scene: "chat")
-            if let id = currentId { createGroup("Trips", moving: id) }
-            newChat()
-            await demoAsk("What's the weather in Delhi this weekend? Search the web and keep it brief.", scene: "web")
-            if let id = currentId, let trips = groups.first(where: { $0.name == "Trips" }) { moveChat(id, to: trips.id) }
-            newChat()
-            if let shot = UserDefaults.standard.string(forKey: "TarnDemoImage"), let img = try? Attachments.read(URL(fileURLWithPath: shot)) {
-                await demoAsk("Split this bill between the 3 of us, in one line.", attach: [img], scene: "image")
+            let d = UserDefaults.standard
+            func attach(_ key: String) -> [Attachment] { d.string(forKey: key).flatMap { try? Attachments.read(URL(fileURLWithPath: $0)) }.map { [$0] } ?? [] }
+            func fileIntoWork() {
+                guard let id = currentId else { return }
+                if let work = groups.first(where: { $0.name == "Work" }) { moveChat(id, to: work.id) } else { createGroup("Work", moving: id) }
             }
-            newChat()
-            await demoAsk("I live in Pune and I'm vegetarian. Remember that.", scene: "memory")
-            newChat()
-            await demoAsk("Suggest a dinner for tonight, in one line.", scene: "recall")
-            if let folder = UserDefaults.standard.string(forKey: "TarnDemoFolder") {
+            newChat(); mark("empty"); try? await Task.sleep(for: .seconds(2.5))
+            await demoAsk("I'm a product manager at a fintech startup, and I like short answers in bullet points. Remember that.", scene: "memory")
+            if let folder = d.string(forKey: "TarnDemoFolder") {
+                let prompt = "Turn my meeting notes into a clean summary with decisions and action items with owners, and save it as a Word doc."
                 let c = createChat()
                 mutate(c.id) { $0.folder = folder }
-                await demoType("Read trip.txt and make a packing list file for it.")
-                mark("folder-send")
+                try? await Task.sleep(for: .seconds(1))
+                await demoType(prompt)
+                mark("doc-send")
                 drafts[c.id] = ""
-                _ = send("Read trip.txt and make a packing list file for it.", attachments: [])
-                _ = await waitUntil(300) { !approvals.isEmpty }
-                mark("approval"); try? await Task.sleep(for: .seconds(3))
+                _ = send(prompt, attachments: [])
+                _ = await waitUntil(400) { !approvals.isEmpty }
+                mark("approval"); try? await Task.sleep(for: .seconds(3.5))
                 for k in approvals.keys { approve(k, .once) }
                 _ = await waitUntil(300) { !isAnswering(currentId) }
-                mark("folder-done"); try? await Task.sleep(for: .seconds(2))
+                mark("doc-done"); try? await Task.sleep(for: .seconds(2))
+                fileIntoWork()
             }
+            newChat()
+            await demoAsk("Draft a reply: I'll send them by Thursday 5 pm, and Pune dipped because the store was being renovated in August.", attach: attach("TarnDemoImage"), scene: "email")
+            fileIntoWork()
+            newChat()
+            await demoAsk("I'm about to sign this rental agreement. What should I watch out for? Keep it short.", attach: attach("TarnDemoPDF"), scene: "lease")
+            newChat()
+            await demoAsk("Find a good beginner 5K plan online and turn it into a simple 3-days-a-week schedule. Keep it short.", scene: "web")
+            newChat()
+            await demoAsk("Write a short LinkedIn post announcing our UPI autopay launch.", scene: "post")
+            fileIntoWork()
+            try? await Task.sleep(for: .seconds(2))
         }
         mark("end")
         tourLog("DONE")

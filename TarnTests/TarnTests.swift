@@ -619,6 +619,15 @@ struct DocumentTests {
         #expect(!text.contains("**") && !text.contains("# "))
     }
 
+    @Test func markdownTablesBecomeWordTables() throws {
+        let dir = try scratchFolder()
+        let url = dir.appendingPathComponent("plan.docx")
+        try Documents.write("## Action items\n\n| Owner | Task |\n|-------|------|\n| Rahul | Fix *Android* checkout |\n\n---\nNext sync Tuesday", to: url)
+        let text = try #require(try Documents.text(url, try Data(contentsOf: url)))
+        #expect(text.contains("Owner") && text.contains("Rahul") && text.contains("Fix Android checkout") && text.contains("Next sync Tuesday"))
+        #expect(!text.contains("|") && !text.contains("---") && !text.contains("*"))
+    }
+
     @Test func readFileReadsPDFsAndWord() async throws {
         let dir = try scratchFolder()
         // A one-page PDF with real text.

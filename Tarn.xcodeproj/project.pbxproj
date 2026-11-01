@@ -14,6 +14,7 @@
 		0BD261DC7E63322F6E04EFD2 /* Backup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E973F4B3B78706B835E122D8 /* Backup.swift */; };
 		0EAD6A498E219C5A99C98D0C /* TarnTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCA39734377624A9522D9D09 /* TarnTests.swift */; };
 		10812E48967C63DFE19EBDA4 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 67419E738A93FDC7CCE44CBD /* MarkdownUI */; };
+		1613F678CA9ED1C4C892344D /* WordDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB21C46B3A014368C3CA0FE6 /* WordDocument.swift */; };
 		169957CC18144C80AC066057 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 40FBC8E724410EB6FFC5E505 /* Sparkle */; };
 		22DFA668BE98C1EC3E7E8A51 /* libllama.0.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 92FFA622BDE1CF3BD1824FD9 /* libllama.0.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		24EE8017268DFA7F6C42259B /* libllama-common.0.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 7E9CA8B2927F46BCCFE7BA56 /* libllama-common.0.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
@@ -134,6 +135,7 @@
 		CF5AFD6D96B13351952D34C5 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		D8D04A7808A406D066038A31 /* Memory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Memory.swift; sourceTree = "<group>"; };
 		E973F4B3B78706B835E122D8 /* Backup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backup.swift; sourceTree = "<group>"; };
+		EB21C46B3A014368C3CA0FE6 /* WordDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordDocument.swift; sourceTree = "<group>"; };
 		EBF8BC24B9AEDD82BCCC30D7 /* Types.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Types.swift; sourceTree = "<group>"; };
 		F1CF41AC0A111DDA49218A3F /* libggml-cpu.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = "libggml-cpu.0.dylib"; sourceTree = "<group>"; };
 		F848B64D0EAB83DCB279242E /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
@@ -259,6 +261,7 @@
 				80E7DC45B8CB281C3F84B8B6 /* Skills.swift */,
 				A558329BFF628B22B7D555F5 /* Storage.swift */,
 				BC3E805940EBD44C5F50F4A8 /* System.swift */,
+				EB21C46B3A014368C3CA0FE6 /* WordDocument.swift */,
 				46BBD621FFC3BC85DEFB110F /* Tools */,
 			);
 			path = Services;
@@ -467,6 +470,7 @@
 				DFF5D3B3C64D2B94AA3F0B3F /* Types.swift in Sources */,
 				F4948B5B66A7992302270176 /* Water.swift in Sources */,
 				26F1029AAD6385EB49DE3AD5 /* WebTools.swift in Sources */,
+				1613F678CA9ED1C4C892344D /* WordDocument.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

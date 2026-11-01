@@ -36,7 +36,9 @@ enum Documents {
     /// Saves `content` to `url`. Word, RTF and OpenDocument paths get a formatted document built
     /// from simple Markdown (# headings, - bullets, 1. lists, **bold**); anything else is plain text.
     static func write(_ content: String, to url: URL) throws {
-        guard let type = types[url.pathExtension.lowercased()] else {
+        let ext = url.pathExtension.lowercased()
+        if ext == "docx" { return try WordDocument.write(content, to: url) }
+        guard let type = types[ext] else {
             try Data(content.utf8).write(to: url, options: .atomic)
             return
         }
@@ -48,17 +50,66 @@ enum Documents {
     static func formatted(_ markdown: String) -> NSAttributedString {
         let out = NSMutableAttributedString()
         let base: CGFloat = 12
-        func font(_ size: CGFloat, bold: Bool) -> NSFont {
-            let f = NSFont(name: "Helvetica", size: size) ?? .systemFont(ofSize: size)
-            return bold ? NSFontManager.shared.convert(f, toHaveTrait: .boldFontMask) : f
+        func font(_ size: CGFloat, bold: Bool = false, italic: Bool = false) -> NSFont {
+            var f = NSFont(name: "Helvetica", size: size) ?? .systemFont(ofSize: size)
+            if bold { f = NSFontManager.shared.convert(f, toHaveTrait: .boldFontMask) }
+            if italic { f = NSFontManager.shared.convert(f, toHaveTrait: .italicFontMask) }
+            return f
         }
-        for raw in markdown.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n") {
-            var line = raw.trimmingCharacters(in: .whitespaces)
+        /// Inline **bold** and *italic* runs.
+        func inline(_ text: String, size: CGFloat, bold: Bool, style: NSParagraphStyle) -> NSAttributedString {
+            let run = NSMutableAttributedString()
+            for (i, part) in text.components(separatedBy: "**").enumerated() where !part.isEmpty {
+                let isBold = bold || i % 2 == 1
+                for (j, piece) in part.components(separatedBy: "*").enumerated() where !piece.isEmpty {
+                    run.append(NSAttributedString(string: piece, attributes: [.font: font(size, bold: isBold, italic: j % 2 == 1), .paragraphStyle: style]))
+                }
+            }
+            return run
+        }
+        let lines = markdown.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
+        var i = 0
+        while i < lines.count {
+            var line = lines[i].trimmingCharacters(in: .whitespaces)
+            // A Markdown table: consecutive lines starting with "|" become a real table.
+            if line.hasPrefix("|") {
+                var rows: [[String]] = []
+                while i < lines.count, lines[i].trimmingCharacters(in: .whitespaces).hasPrefix("|") {
+                    let cells = lines[i].trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "|"))
+                        .components(separatedBy: "|").map { $0.trimmingCharacters(in: .whitespaces) }
+                    if !cells.allSatisfy({ $0.isEmpty || $0.allSatisfy { "-:".contains($0) } }) { rows.append(cells) }
+                    i += 1
+                }
+                let columns = rows.map(\.count).max() ?? 0
+                guard columns > 0 else { continue }
+                let table = NSTextTable()
+                table.numberOfColumns = columns
+                table.collapsesBorders = true
+                table.setContentWidth(100, type: .percentageValueType)
+                for (r, row) in rows.enumerated() {
+                    for c in 0..<columns {
+                        let block = NSTextTableBlock(table: table, startingRow: r, rowSpan: 1, startingColumn: c, columnSpan: 1)
+                        block.setWidth(0.5, type: .absoluteValueType, for: .border)
+                        block.setBorderColor(NSColor(calibratedWhite: 0.6, alpha: 1))
+                        block.setWidth(4, type: .absoluteValueType, for: .padding)
+                        if r == 0 { block.backgroundColor = NSColor(calibratedWhite: 0.94, alpha: 1) }
+                        let style = NSMutableParagraphStyle()
+                        style.textBlocks = [block]
+                        let cell = c < row.count ? row[c] : ""
+                        out.append(inline(cell.isEmpty ? " " : cell, size: base - 1, bold: r == 0, style: style))
+                        out.append(NSAttributedString(string: "\n", attributes: [.font: font(base - 1), .paragraphStyle: style]))
+                    }
+                }
+                continue
+            }
+            i += 1
+            // Horizontal rules (---, ***) only separate sections in Markdown; Word doesn't need them.
+            if line.firstMatch(of: /^(-{3,}|\*{3,}|_{3,})$/) != nil { continue }
             let style = NSMutableParagraphStyle()
             style.paragraphSpacing = 6
             var size = base, bold = false, prefix = ""
-            if let m = line.firstMatch(of: /^(#{1,3})\s+(.*)$/) {
-                let level = m.1.count
+            if let m = line.firstMatch(of: /^(#{1,4})\s+(.*)$/) {
+                let level = min(3, m.1.count)
                 size = [20, 16, 13.5][level - 1]
                 bold = true
                 style.paragraphSpacingBefore = level == 1 ? 6 : 10
@@ -77,11 +128,8 @@ enum Documents {
                 style.paragraphSpacing = 3
             }
             out.append(NSAttributedString(string: prefix, attributes: [.font: font(size, bold: bold), .paragraphStyle: style]))
-            // **bold** runs inside the line
-            for (i, part) in line.components(separatedBy: "**").enumerated() where !part.isEmpty {
-                out.append(NSAttributedString(string: part, attributes: [.font: font(size, bold: bold || i % 2 == 1), .paragraphStyle: style]))
-            }
-            out.append(NSAttributedString(string: "\n", attributes: [.font: font(size, bold: false), .paragraphStyle: style]))
+            out.append(inline(line, size: size, bold: bold, style: style))
+            out.append(NSAttributedString(string: "\n", attributes: [.font: font(size), .paragraphStyle: style]))
         }
         return out
     }
