@@ -201,7 +201,7 @@ enum PastChats {
 struct RememberTool: Tool {
     let save: @Sendable (String) async -> String
     let name = "remember"
-    let description = "Save a short fact about the user that will help in future chats: their name, work, where they live, family, ongoing projects or preferences. Write it as a standalone sentence, e.g. “Lives in Pune and works as a nurse.” Never save passwords, card numbers or other secrets, and skip things that only matter for this chat."
+    let description = "Save a short fact about the user that will help in future chats: their name, work, where they live, family, ongoing projects or preferences. Write it as a standalone sentence, e.g. “Lives in Pune and works as a nurse.” Only save what the user says about themselves in their own messages; never infer facts from images, files, receipts or web results (a café receipt from Pune doesn’t mean they live in Pune). Never save passwords, card numbers or other secrets, and skip things that only matter for this chat."
     var parameters: [String: Any] { schema(["fact": ["type": "string", "description": "The fact to remember, as one short sentence."]], required: ["fact"]) }
     func label(_ args: [String: Any]) -> String { "Saved to memory: “\((args["fact"] as? String ?? "").prefix(90))”" }
     func run(_ args: [String: Any], _ ctx: ToolContext) async throws -> String { await save(try args.string("fact")) }

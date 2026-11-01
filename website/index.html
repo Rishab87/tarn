@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tarn: an AI that lives on your Mac</title>
-  <meta name="description" content="Tarn picks the right open AI model for your Mac, downloads it, and runs it on your computer. No account, no subscription, nothing sent to the cloud.">
+  <title>Tarn · an ai that lives on your mac</title>
+  <meta name="description" content="A private AI for your Mac. It picks the right open model for your Mac, runs it on your computer and works offline. Free, no account.">
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#111212" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f2f2ef" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f1011" media="(prefers-color-scheme: dark)">
   <meta property="og:title" content="Tarn: an AI that lives on your Mac">
-  <meta property="og:description" content="A private AI for your Mac. No account, no subscription, nothing sent to the cloud.">
+  <meta property="og:description" content="Private, free, and it works offline. No account.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://tarn-ai.vercel.app/">
   <meta property="og:image" content="https://tarn-ai.vercel.app/assets/og.png">
@@ -20,110 +20,103 @@
   <link rel="canonical" href="https://tarn-ai.vercel.app/">
   <link rel="icon" href="/assets/mark.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/assets/icon-180.png">
+  <link rel="preload" as="image" href="/media/hero.jpg">
   <link rel="stylesheet" href="/styles.css">
-  <script>
-    // Apply the saved theme before first paint, so the page never flashes the wrong one.
-    try { var t = localStorage.getItem('tarn-theme'); if (t) document.documentElement.dataset.theme = t } catch (e) {}
-  </script>
+  <script>try { var t = localStorage.getItem('tarn-theme'); if (t) document.documentElement.dataset.theme = t } catch (e) {}</script>
 </head>
 <body>
-  <header class="top">
-    <a class="brand" href="/" aria-label="Tarn home">
-      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 19 L11 8.5 L15.5 14 L19.5 9.5 L29 19" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 23.5 C10 21.2 22 21.2 26 23.5 C22 27 10 27 6 23.5 Z" fill="currentColor"/></svg>
-      Tarn
-    </a>
-    <div class="top-actions">
-      <button class="theme" type="button" aria-label="Appearance: System" title="Appearance">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></svg>
-        <span class="theme-label">System</span>
+  <header class="menubar">
+    <nav class="menu-left" aria-label="Site">
+      <a class="brand" href="/" aria-label="Tarn home">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 19 L11 8.5 L15.5 14 L19.5 9.5 L29 19" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 23.5 C10 21.2 22 21.2 26 23.5 C22 27 10 27 6 23.5 Z" fill="currentColor"/></svg>
+        tarn
+      </a>
+      <a href="https://github.com/Rishab87/tarn">github</a>
+      <a href="/privacy">privacy</a>
+    </nav>
+    <div class="menu-right">
+      <span class="status" title="works offline" aria-label="works offline">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 9.2a14 14 0 0 1 19 0M5.6 12.5a9.5 9.5 0 0 1 12.8 0M8.8 15.8a5 5 0 0 1 6.4 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="19" r="1.3" fill="currentColor"/><path d="M4 3.5l16 17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      </span>
+      <button class="status theme" type="button" aria-label="appearance: system" title="appearance">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg>
       </button>
-      <a class="btn btn-small" href="/download/Tarn.dmg" data-download>Download</a>
+      <time class="clock" aria-hidden="true"></time>
+      <a class="menu-download" href="/download/Tarn.dmg" data-download>download</a>
     </div>
   </header>
 
   <main>
     <section class="hero">
-      <h1>An AI that lives on your Mac.</h1>
-      <p class="lede">Tarn picks the right open AI for your Mac, downloads it, and runs it right here. No account, no subscription, nothing sent to the cloud.</p>
-      <div class="cta">
-        <a class="btn" href="/download/Tarn.dmg" data-download>Download for Mac</a>
-        <p class="req">Free. For Macs with Apple silicon (M1 or newer) running macOS 26 or later. The download is 18 MB; Tarn fetches its AI after you open it.</p>
-      </div>
-      <figure class="shot">
-        <img class="shot-light" src="/assets/app-light.jpg" width="1600" height="1084" alt="Tarn's chat window in light mode, answering a request to plan a three-day trip to Jaipur.">
-        <img class="shot-dark" src="/assets/app-dark.jpg" width="1600" height="1084" alt="Tarn's chat window in dark mode.">
+      <h1>an ai that lives on your&nbsp;mac.</h1>
+      <p class="sub">private, free, and it works offline. no account.</p>
+      <a class="btn" href="/download/Tarn.dmg" data-download>download for mac</a>
+      <p class="req">free, for apple silicon macs on macos 26 or later</p>
+
+      <a class="desk-file" href="/download/Tarn.dmg" data-download aria-label="download Tarn.dmg">
+        <img src="/assets/icon-180.png" width="72" height="72" alt="">
+        <span>Tarn.dmg</span>
+      </a>
+    </section>
+
+    <section class="desk" aria-label="Tarn in use">
+      <figure class="win main">
+        <video class="clip-video" autoplay muted loop playsinline preload="auto" poster="/media/hero.jpg" aria-label="Tarn planning a weekend in Jaipur, answering on the Mac">
+          <source src="/media/hero.mp4" type="video/mp4">
+        </video>
       </figure>
+
+      <div class="clips">
+        <figure class="win clip">
+          <figcaption class="titlebar"><i></i><i></i><i></i><span>split-the-bill.mov</span></figcaption>
+          <video class="clip-video" muted loop playsinline preload="none" poster="/media/split-the-bill.jpg" aria-label="Tarn reading a receipt photo and splitting the bill three ways">
+            <source src="/media/split-the-bill.mp4" type="video/mp4">
+          </video>
+        </figure>
+        <figure class="win clip">
+          <figcaption class="titlebar"><i></i><i></i><i></i><span>remembers-you.mov</span></figcaption>
+          <video class="clip-video" muted loop playsinline preload="none" poster="/media/remembers-you.jpg" aria-label="Tarn remembering that you are vegetarian and suggesting a vegetarian dinner later">
+            <source src="/media/remembers-you.mp4" type="video/mp4">
+          </video>
+        </figure>
+        <figure class="win clip">
+          <figcaption class="titlebar"><i></i><i></i><i></i><span>looks-things-up.mov</span></figcaption>
+          <video class="clip-video" muted loop playsinline preload="none" poster="/media/looks-things-up.jpg" aria-label="Tarn searching the web for this weekend's weather">
+            <source src="/media/looks-things-up.mp4" type="video/mp4">
+          </video>
+        </figure>
+        <figure class="win clip">
+          <figcaption class="titlebar"><i></i><i></i><i></i><span>packs-for-goa.mov</span></figcaption>
+          <video class="clip-video" muted loop playsinline preload="none" poster="/media/packs-for-goa.jpg" aria-label="Tarn reading a trip note in a folder and writing a packing list after asking first">
+            <source src="/media/packs-for-goa.mp4" type="video/mp4">
+          </video>
+        </figure>
+      </div>
     </section>
 
-    <section class="block">
-      <h2>Chooses the right AI for your Mac</h2>
-      <p>When you first open Tarn it looks at your Mac’s chip and memory, then downloads the most capable model that still leaves half your memory free, so your browser and apps stay quick. You never have to know what a model is called.</p>
-      <table class="fit">
-        <thead><tr><th scope="col">Your Mac’s memory</th><th scope="col">Tarn installs</th></tr></thead>
-        <tbody>
-          <tr><td>8 GB</td><td>Recommended (4B), or Lighter (2B)</td></tr>
-          <tr><td>16–24 GB</td><td>Recommended (9B), or Lighter (4B)</td></tr>
-          <tr><td>32 GB or more</td><td>Recommended (35B), or Lighter (9B)</td></tr>
-        </tbody>
-      </table>
-      <p class="note">Macs with a Max or Ultra chip and 32 GB or more get a smarter 27B model. Want more than Recommended? Settings offers the next model up, with a warning when your Mac is short on memory. Tarn checks for improved versions each time it opens, and better models arrive with app updates.</p>
+    <section class="fits">
+      <p>it picks the right ai for your mac</p>
+      <ul class="chips">
+        <li><span>8 gb</span> 4b</li>
+        <li><span>16 gb</span> 9b</li>
+        <li><span>32 gb+</span> 35b</li>
+      </ul>
     </section>
 
-    <section class="block">
-      <h2>What it does</h2>
-      <dl class="features">
-        <div><dt>Private by default</dt><dd>Your chats stay on your Mac. No account and no analytics.</dd></div>
-        <div><dt>Remembers you</dt><dd>Mention your diet, your city or what you’re learning once, and Tarn keeps it in mind in later chats. You can see and delete everything it remembers.</dd></div>
-        <div><dt>Reads images</dt><dd>Paste a screenshot or drop in a photo and ask about it: a confusing error, a bill, a plant you can’t name.</dd></div>
-        <div><dt>Looks things up</dt><dd>Searches the web for news, prices and anything recent, and links its sources.</dd></div>
-        <div><dt>Works in your folders</dt><dd>Share a folder and Tarn can read, organise and write files there. It asks before every change.</dd></div>
-        <div><dt>Connectors and skills</dt><dd>Plug in tools through MCP, and teach it how you like things done. Skills made for Claude work too.</dd></div>
-        <div><dt>Gives memory back</dt><dd>If your Mac runs low, Tarn offers a lighter model or frees its memory until you need it.</dd></div>
-        <div><dt>Moves with you</dt><dd>Back up every chat to one file and bring it to your next Mac.</dd></div>
-      </dl>
+    <section class="water">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2c3.6 4.4 6 7.7 6 10.6a6 6 0 0 1-12 0c0-2.9 2.4-6.2 6-10.6z" fill="currentColor"/></svg>
+      <p>every answer here is one a data center didn’t write. tarn counts the water you save.</p>
     </section>
 
-    <section class="block water">
-      <h2>Water you don’t spend</h2>
-      <p>Cloud AI uses water to cool data centers and to make the electricity they run on. Every answer Tarn writes on your Mac is one a data center didn’t, and Tarn keeps count.</p>
-      <details>
-        <summary>How we count it</summary>
-        <p>Tarn counts 1.1 mL per answer. Google measured a typical chatbot answer at 0.26 mL of cooling water and 0.24 Wh of energy; generating that electricity uses about 0.9 mL more at the US-average rate. Your Mac’s own electricity isn’t subtracted. Sources: <a href="https://arxiv.org/abs/2508.15734">Google, 2025</a> and <a href="https://arxiv.org/abs/2304.03271">UC Riverside</a>.</p>
-      </details>
-    </section>
-
-    <section class="block" id="first-launch">
-      <h2>Opening Tarn the first time</h2>
-      <p>Tarn is new and isn’t notarized by Apple yet, so macOS asks before opening it the first time.</p>
-      <ol class="steps">
-        <li>Open <strong>Tarn.dmg</strong> and drag Tarn into Applications.</li>
-        <li>Open Tarn. When macOS says it can’t verify Tarn, click <strong>Done</strong>.</li>
-        <li>Open <strong>System Settings → Privacy &amp; Security</strong>, scroll down, and click <strong>Open Anyway</strong> next to Tarn.</li>
-        <li>Confirm with your password. From then on Tarn opens normally.</li>
-      </ol>
-    </section>
-
-    <section class="block faq">
-      <h2>Questions</h2>
-      <details><summary>Is it free?</summary><p>Yes. No account, no ads, no subscription.</p></details>
-      <details><summary>Which Macs does it run on?</summary><p>Macs with Apple silicon (M1 or newer, including MacBook Neo) running macOS 26 Tahoe or later, with at least 8 GB of memory. Intel Macs are too slow for it.</p></details>
-      <details><summary>How much space does it need?</summary><p>The app is about 40 MB. The AI it downloads is 1.3 to 18 GB depending on your Mac: 5.7 GB on a 16 GB Mac.</p></details>
-      <details><summary>Is it as smart as ChatGPT or Claude?</summary><p>For everyday writing, summarising, planning, explaining and searching, it does the job well. For the hardest reasoning and very long documents, the big cloud models are still ahead.</p></details>
-      <details><summary>What leaves my Mac?</summary><p>Only three things: the one-time AI download from Hugging Face, web searches through DuckDuckGo when web search is on, and update checks. Your chats and files never do. <a href="/privacy">Privacy details</a>.</p></details>
-      <details><summary>Does it work offline?</summary><p>Yes. Once the AI is downloaded, everything except web search works without internet.</p></details>
-      <details><summary>How do I move to a new Mac?</summary><p>Settings → Chats &amp; Backup → Back up. On the new Mac, choose “Restore a backup” when Tarn first opens.</p></details>
-      <details><summary>How do I remove it?</summary><p>Quit Tarn, drag it from Applications to the Trash, and delete the folder ~/Library/Application Support/Tarn, which holds your chats and the AI model.</p></details>
-    </section>
-
-    <section class="closing">
-      <h2>Try it on your Mac.</h2>
-      <a class="btn" href="/download/Tarn.dmg" data-download>Download for Mac</a>
-    </section>
+    <details class="first">
+      <summary>opening it the first time?</summary>
+      <p>tarn isn’t notarized by apple yet, so macos asks first. open tarn, click done, then go to system settings → privacy &amp; security and click <strong>open anyway</strong>. after that it opens normally.</p>
+    </details>
   </main>
 
   <footer class="foot">
-    <p>Tarn is free and open source under the MIT License. <a href="https://github.com/Rishab87/tarn">Source on GitHub</a> · <a href="https://github.com/Rishab87/tarn/issues">Report a problem</a> · <a href="/privacy">Privacy</a></p>
-    <p>Runs on <a href="https://github.com/ggml-org/llama.cpp">llama.cpp</a> (MIT) with Qwen models (Apache 2.0).</p>
+    <p>free and open source, mit license. <a href="https://github.com/Rishab87/tarn">source</a> <a href="https://github.com/Rishab87/tarn/issues">report a problem</a> <a href="/privacy">privacy</a></p>
+    <p>runs on <a href="https://github.com/ggml-org/llama.cpp">llama.cpp</a> with qwen models.</p>
   </footer>
   <script src="/script.js"></script>
 </body>

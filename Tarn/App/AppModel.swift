@@ -1206,6 +1206,8 @@ final class AppModel {
         update { $0.theme = .light }
         try? await Task.sleep(for: .seconds(1.5))
         pinWindowForRecording()
+        NSCursor.hide()
+        defer { NSCursor.unhide() }
         tourLog("WAIT-RECORDER")
         // The harness starts the screen recorder, then writes "go" to tour.ack.
         let ack = Paths.data.appendingPathComponent("tour.ack")

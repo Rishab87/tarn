@@ -19,6 +19,8 @@ struct Segment: Decodable {
     var speed: Double?          // clip playback speed
     var cam: [Cam]?
     var caption: String?
+    var typeCaption: Bool?      // false: show the caption whole (continuing scene)
+    var map: [[Double]]?        // [[local 0…1, source seconds], …]: speed ramps within a clip
     var cut: Bool?              // hard cut into this segment (no transition)
 }
 
@@ -119,7 +121,7 @@ let icon = NSImage(contentsOf: base.appendingPathComponent("../website/assets/ic
 // MARK: Segment drawing
 
 /// Draws app footage in a rounded "window" panel with a soft shadow, framed by the camera.
-func drawPanel(_ ctx: CGContext, _ img: CGImage, cam: Cam, pulse: Double, caption: String?, local: Double) {
+func drawPanel(_ ctx: CGContext, _ img: CGImage, cam: Cam, pulse: Double, caption: String?, local: Double, typeCaption: Bool = true) {
     let hasCaption = caption != nil
     let maxW: CGFloat = hasCaption ? 1560 : 1640, maxH: CGFloat = hasCaption ? 860 : 960
     let aspect = CGFloat(img.width) / CGFloat(img.height)
@@ -148,7 +150,7 @@ func drawPanel(_ ctx: CGContext, _ img: CGImage, cam: Cam, pulse: Double, captio
     ctx.addPath(path); ctx.setStrokeColor(CGColor(gray: 0, alpha: 0.08)); ctx.setLineWidth(1.5); ctx.strokePath()
     ctx.restoreGState()
     if let caption {
-        let n = Int(Double(caption.count) * clamp(local / 0.35))
+        let n = typeCaption ? Int(Double(caption.count) * clamp(local / 0.2)) : caption.count
         let shown = String(caption.prefix(n))
         drawText(ctx, shown, font(serif, 58), ink, center: CGPoint(x: W / 2, y: 92))
     }
@@ -157,7 +159,7 @@ func drawPanel(_ ctx: CGContext, _ img: CGImage, cam: Cam, pulse: Double, captio
 func drawSegment(_ ctx: CGContext, _ seg: Segment, local: Double, segSeconds: Double, absTime: Double) {
     // local: 0…1 progress through the segment
     let sinceBeat = absTime.truncatingRemainder(dividingBy: beat)
-    let pulse = 1 + 0.012 * exp(-sinceBeat / 0.09)
+    let pulse = 1 + 0.016 * exp(-sinceBeat / 0.09)
     switch seg.type {
     case "text":
         let lines = seg.lines ?? []
@@ -202,16 +204,23 @@ func drawSegment(_ ctx: CGContext, _ seg: Segment, local: Double, segSeconds: Do
             ctx.restoreGState()
         }
         let t2 = clamp((local - 0.18) / 0.3)
-        drawText(ctx, "Tarn", font("system", 92, bold: true), ink, center: CGPoint(x: W / 2, y: H / 2 - 190), alpha: t2, scale: lerp(0.94, 1, easeInOut(t2)))
+        drawText(ctx, "tarn", font("system", 92, bold: true), ink, center: CGPoint(x: W / 2, y: H / 2 - 190), alpha: t2, scale: lerp(0.94, 1, easeInOut(t2)))
         if seg.type == "end" {
             let t3 = clamp((local - 0.35) / 0.3)
-            drawText(ctx, "Free, private AI for your Mac.", font(serif, 50), muted, center: CGPoint(x: W / 2, y: H / 2 - 285), alpha: t3)
+            drawText(ctx, seg.lines?.first ?? "free, private ai for your mac.", font(serif, 50), muted, center: CGPoint(x: W / 2, y: H / 2 - 285), alpha: t3)
         }
     case "clip":
         guard let src = seg.src else { return }
-        let t = (seg.from ?? 0) + local * segSeconds * (seg.speed ?? 1)
+        // Punch in on the beat each scene starts on.
+        let entry = 1 + 0.07 * pow(1 - clamp(local * segSeconds / 0.35), 3)
+        var t = (seg.from ?? 0) + local * segSeconds * (seg.speed ?? 1)
+        if let map = seg.map, map.count >= 2 {
+            let i = max(1, min(map.count - 1, map.firstIndex(where: { $0[0] >= local }) ?? map.count - 1))
+            let a = map[i - 1], b = map[i]
+            t = lerp(a[1], b[1], clamp((local - a[0]) / max(0.0001, b[0] - a[0])))
+        }
         if let img = clip(src).frame(at: t) {
-            drawPanel(ctx, img, cam: camAt(seg.cam, local), pulse: pulse, caption: seg.caption, local: local)
+            drawPanel(ctx, img, cam: camAt(seg.cam, local), pulse: pulse * entry, caption: seg.caption, local: local, typeCaption: seg.typeCaption ?? true)
         }
     case "still":
         guard let src = seg.src, let img = still(src) else { return }
@@ -244,9 +253,20 @@ writer.add(input)
 writer.startWriting()
 writer.startSession(atSourceTime: .zero)
 
+// The website's dot grid, very faint, so the video and the site feel like one place.
+let dotLayer: CGImage = {
+    let c = CGContext(data: nil, width: Int(W), height: Int(H), bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    c.setFillColor(CGColor(red: 0.985, green: 0.985, blue: 0.978, alpha: 1))
+    c.fill(CGRect(x: 0, y: 0, width: W, height: H))
+    c.setFillColor(CGColor(gray: 0, alpha: 0.085))
+    let step: CGFloat = 30
+    var y: CGFloat = step / 2
+    while y < H { var x: CGFloat = step / 2; while x < W { c.fillEllipse(in: CGRect(x: x - 1.3, y: y - 1.3, width: 2.6, height: 2.6)); x += step }; y += step }
+    return c.makeImage()!
+}()
+
 func render(_ ctx: CGContext, at t: Double) {
-    ctx.setFillColor(CGColor(gray: 1, alpha: 1))
-    ctx.fill(CGRect(x: 0, y: 0, width: W, height: H))
+    ctx.draw(dotLayer, in: CGRect(x: 0, y: 0, width: W, height: H))
     guard let i = starts.lastIndex(where: { $0 <= t }) else { return }
     let seg = tl.segments[i]
     let local = (t - starts[i]) / segDur[i]
@@ -275,7 +295,10 @@ func render(_ ctx: CGContext, at t: Double) {
     }
 }
 
-for f in 0..<frames {
+// Optional preview range: render <out> [fromSec toSec]
+let fromFrame = args.count > 4 ? Int(Double(args[3])! * fps) : 0
+let toFrame = args.count > 4 ? min(frames, Int(Double(args[4])! * fps)) : frames
+for f in fromFrame..<toFrame {
     while !input.isReadyForMoreMediaData { Thread.sleep(forTimeInterval: 0.002) }
     var pb: CVPixelBuffer?
     CVPixelBufferPoolCreatePixelBuffer(nil, adaptor.pixelBufferPool!, &pb)
@@ -286,7 +309,7 @@ for f in 0..<frames {
                         bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)!
     render(ctx, at: Double(f) / fps)
     CVPixelBufferUnlockBaseAddress(buffer, [])
-    adaptor.append(buffer, withPresentationTime: CMTime(value: CMTimeValue(f), timescale: CMTimeScale(tl.fps)))
+    adaptor.append(buffer, withPresentationTime: CMTime(value: CMTimeValue(f - fromFrame), timescale: CMTimeScale(tl.fps)))
     if f % 120 == 0 { print("frame \(f)/\(frames)") }
 }
 input.markAsFinished()
