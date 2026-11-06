@@ -54,7 +54,7 @@ final class Engine {
 
     private func start(_ cfg: Config) async throws {
         guard let bin = Paths.llamaServer, FileManager.default.isExecutableFile(atPath: bin.path) else {
-            state = .failed(modelId: cfg.modelId, message: "Tarn’s AI engine is missing. Download Tarn again from its website.")
+            state = .failed(modelId: cfg.modelId, message: EngineError.missing.localizedDescription)
             throw EngineError.missing
         }
         Self.killStale(binary: bin)
@@ -119,8 +119,9 @@ final class Engine {
         while Date() < deadline {
             if !p.isRunning {
                 let tail = (try? String(contentsOf: logURL, encoding: .utf8)).map { String($0.suffix(4000)) } ?? ""
-                state = .failed(modelId: cfg.modelId, message: Self.friendlyStartError(tail))
-                throw EngineError.exited
+                let reason = Self.friendlyStartError(tail)
+                state = .failed(modelId: cfg.modelId, message: reason)
+                throw EngineError.exited(reason)
             }
             if await healthy() {
                 markActive()
@@ -130,7 +131,7 @@ final class Engine {
             try await Task.sleep(for: .milliseconds(300))
         }
         await stop()
-        state = .failed(modelId: cfg.modelId, message: "The AI took too long to start.")
+        state = .failed(modelId: cfg.modelId, message: EngineError.timeout.localizedDescription)
         throw EngineError.timeout
     }
 
@@ -181,7 +182,23 @@ final class Engine {
         return n > 0 ? Array(buffer.prefix(min(Int(n), buffer.count))).filter { $0 > 0 } : []
     }
 
-    enum EngineError: Error { case missing, exited, timeout }
+    /// What the chat shows when the engine can't answer, so each case reads as a sentence.
+    enum EngineError: LocalizedError {
+        case missing, exited(String), timeout, noPort
+
+        var errorDescription: String? {
+            switch self {
+            case .missing:
+                // Moving or deleting Tarn while it's open takes its engine with it.
+                return FileManager.default.fileExists(atPath: Bundle.main.bundlePath)
+                    ? "Tarn’s AI engine is missing. Download Tarn again from its website."
+                    : "This copy of Tarn was moved or deleted while it was open. Quit Tarn and open it again."
+            case .exited(let reason): return reason
+            case .timeout: return "The AI took too long to start. Try again."
+            case .noPort: return "Tarn couldn’t start its AI engine. Quit Tarn and open it again."
+            }
+        }
+    }
 
     /// $@ is llama-server and its arguments. Exits with llama-server's status.
     static let watchdog = """
@@ -213,7 +230,7 @@ final class Engine {
 
     static func freePort() throws -> Int {
         let fd = socket(AF_INET, SOCK_STREAM, 0)
-        guard fd >= 0 else { throw EngineError.exited }
+        guard fd >= 0 else { throw EngineError.noPort }
         defer { close(fd) }
         var addr = sockaddr_in()
         addr.sin_family = sa_family_t(AF_INET)
@@ -223,7 +240,7 @@ final class Engine {
         let bound = withUnsafeMutablePointer(to: &addr) {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, len) == 0 && getsockname(fd, $0, &len) == 0 }
         }
-        guard bound else { throw EngineError.exited }
+        guard bound else { throw EngineError.noPort }
         return Int(UInt16(bigEndian: addr.sin_port))
     }
 

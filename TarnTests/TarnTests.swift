@@ -759,3 +759,28 @@ struct PixelTests {
     }
 }
 
+
+@Suite("Engine errors people can read")
+@MainActor
+struct EngineErrorTests {
+    // The chat shows error.localizedDescription. Before build 8 these read
+    // "The operation couldn’t be completed. (Tarn.Engine.EngineError error 0.)"
+    @Test func everyEngineErrorReadsLikeASentence() {
+        for error in [Engine.EngineError.missing, .exited("Your Mac didn’t have enough free memory to load the AI."), .timeout, .noPort] {
+            let text = error.localizedDescription
+            #expect(!text.contains("EngineError"), "raw error text: \(text)")
+            #expect(!text.contains("couldn’t be completed"), "generic error text: \(text)")
+        }
+    }
+
+    @Test func aCrashKeepsItsReason() {
+        let reason = Engine.friendlyStartError("ggml_metal: failed to allocate buffer")
+        #expect(Engine.EngineError.exited(reason).localizedDescription == reason)
+        #expect(reason.contains("memory"))
+    }
+
+    @Test func missingEngineSaysWhatToDo() {
+        // The test host's bundle exists, so this is the "engine file is gone" message.
+        #expect(Engine.EngineError.missing.localizedDescription.contains("Download Tarn again"))
+    }
+}
