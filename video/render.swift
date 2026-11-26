@@ -22,7 +22,11 @@ struct Seg: Decodable {
     var frames: String?       // card: folder of PNG frames (the pixel scene), played at 12 fps
     var lines: [String]?      // card: title, then smaller lines
     var fadeIn: Double?       // dissolve from the previous segment over this many seconds
+    var tag: String?          // clip: a small label in the corner while it plays at real time ("real time")
+    var captions: [Caption]?  // clip: what the hand is doing, e.g. "holding ⌥⌘", at the bottom centre
 }
+
+struct Caption: Decodable { var from: Double; var to: Double; var text: String }
 
 struct Timeline: Decodable { var fps: Int; var width: Int; var height: Int; var fadeIn: Double?; var fadeOut: Double?; var segments: [Seg] }
 
@@ -124,9 +128,9 @@ func drawFootage(_ ctx: CGContext, _ img: CGImage, x: Double, y: Double, z: Doub
 }
 
 /// "sped up", small, in the corner, whenever the footage runs faster than real time.
-func drawSpedUp(_ ctx: CGContext, alpha: CGFloat) {
+func drawSpedUp(_ ctx: CGContext, alpha: CGFloat, text: String = "sped up") {
     guard alpha > 0.01 else { return }
-    let l = makeLine("sped up", sans(20, .medium), CGColor(gray: 1, alpha: alpha))
+    let l = makeLine(text, sans(20, .medium), CGColor(gray: 1, alpha: alpha))
     var ascent: CGFloat = 0, descent: CGFloat = 0
     _ = CTLineGetTypographicBounds(l, &ascent, &descent, nil)
     let rect = CGRect(x: W - 36 - lineWidth(l) - 28, y: 30, width: lineWidth(l) + 28, height: 34)
@@ -135,6 +139,21 @@ func drawSpedUp(_ ctx: CGContext, alpha: CGFloat) {
     ctx.setFillColor(CGColor(gray: 0.08, alpha: 0.55 * alpha))
     ctx.fillPath()
     ctx.textPosition = CGPoint(x: rect.minX + 14, y: rect.midY - (ascent - descent) / 2)
+    CTLineDraw(l, ctx)
+    ctx.restoreGState()
+}
+
+/// A larger pill at the bottom centre for what the scripted hand does ("holding ⌥⌘").
+func drawCaption(_ ctx: CGContext, _ text: String, alpha: CGFloat) {
+    let l = makeLine(text, sans(30, .semibold), CGColor(gray: 1, alpha: alpha))
+    var ascent: CGFloat = 0, descent: CGFloat = 0
+    _ = CTLineGetTypographicBounds(l, &ascent, &descent, nil)
+    let rect = CGRect(x: W / 2 - (lineWidth(l) + 48) / 2, y: 64, width: lineWidth(l) + 48, height: 58)
+    ctx.saveGState()
+    ctx.addPath(CGPath(roundedRect: rect, cornerWidth: 16, cornerHeight: 16, transform: nil))
+    ctx.setFillColor(CGColor(gray: 0.08, alpha: 0.62 * alpha))
+    ctx.fillPath()
+    ctx.textPosition = CGPoint(x: rect.minX + 24, y: rect.midY - (ascent - descent) / 2)
     CTLineDraw(l, ctx)
     ctx.restoreGState()
 }
@@ -151,6 +170,12 @@ func drawSegment(_ ctx: CGContext, _ seg: Seg, local: Double) {
         let fast = { (t: Double) in speed(map, t) > 1.5 ? 1.0 : 0.0 }
         let a = (fast(local) + fast(local - 0.12) + fast(local + 0.12) + fast(local - 0.24) + fast(local + 0.24)) / 5
         drawSpedUp(ctx, alpha: CGFloat(a))
+        // A segment that never speeds up can say so in the same place.
+        if let tag = seg.tag, a < 0.01 { drawSpedUp(ctx, alpha: CGFloat(smooth(clamp(local / 0.6))), text: tag) }
+        for c in seg.captions ?? [] {
+            let k = min(smooth(clamp((local - c.from) / 0.25)), smooth(clamp((c.to - local) / 0.25)))
+            if k > 0.01 { drawCaption(ctx, c.text, alpha: CGFloat(k)) }
+        }
     case "card":
         if let dir = seg.frames {
             let f = frames(dir)

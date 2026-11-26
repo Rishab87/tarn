@@ -21,3 +21,10 @@ video/timeline.json
 video/music/
 website/media/*.mp4
 video/card/
+video/stage
+video/make_screen_props
+video/props/
+video/timeline-screen.json
+video/.demo-profile/
+video/.dryrun-profile/
+video/timeline-*.json

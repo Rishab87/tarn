@@ -48,6 +48,9 @@ struct AppSettings: Codable, Equatable {
     var memoryGuard = true
     /// Remember facts about the user across chats (stored only on this Mac).
     var memoryEnabled = true
+    /// Hold ⌥⌘ anywhere to circle part of the screen and ask about it. Off until the user turns
+    /// it on, because macOS asks for Screen Recording (the rule: on by default only if nothing is asked).
+    var screenAsk = false
     var water = WaterStats()
 
     init() {}
@@ -67,6 +70,7 @@ struct AppSettings: Codable, Equatable {
         idleUnloadMinutes = [0, 5, 15, 30, 60].contains(idle) ? idle : d.idleUnloadMinutes
         memoryGuard = (try? c.decode(Bool.self, forKey: .memoryGuard)) ?? d.memoryGuard
         memoryEnabled = (try? c.decode(Bool.self, forKey: .memoryEnabled)) ?? d.memoryEnabled
+        screenAsk = (try? c.decode(Bool.self, forKey: .screenAsk)) ?? d.screenAsk
         var w = (try? c.decode(WaterStats.self, forKey: .water)) ?? d.water
         if w.answers < 0 || !w.ml.isFinite || w.ml < 0 { w = WaterStats() }
         water = w

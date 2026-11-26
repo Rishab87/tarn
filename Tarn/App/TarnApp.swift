@@ -23,6 +23,8 @@ struct TarnApp: App {
                 Button("Search Chats") { model.searchOpen = true }.keyboardShortcut("k")
             }
             CommandGroup(after: .newItem) {
+                Button("Ask About Your Screen…") { Task { await model.screenAsk?.begin(.fresh) } }
+                    .disabled(!model.booted || !model.settings.onboarded)
                 Divider()
                 Button("Back Up Chats…") { model.exportBackup() }.disabled(!model.booted)
             }
@@ -50,6 +52,7 @@ struct TarnApp: App {
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Group {
@@ -62,13 +65,16 @@ struct RootView: View {
             }
         }
         .onChange(of: model.openSettingsRequest) { openSettings() }
+        .onChange(of: model.booted) { model.screenAsk?.openWindow = openWindow }
     }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var model: AppModel?
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    /// With "Ask about your screen" on, Tarn keeps running after its window closes so ⌥⌘ still works.
+    @MainActor
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { !(model?.settings.screenAsk ?? false) }
 
     @MainActor
     func applicationWillTerminate(_ notification: Notification) {

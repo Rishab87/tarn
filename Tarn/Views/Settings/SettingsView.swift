@@ -64,6 +64,7 @@ private struct GeneralPane: View {
                     Text("Tarn unloads its AI when idle and reloads it in seconds when you return.")
                 }
             }
+            ScreenAskSection()
         }
         .formStyle(.grouped)
     }
@@ -616,5 +617,32 @@ private struct AboutPane: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// Settings → General: the ⌥⌘ screen question switch and its two macOS permissions.
+private struct ScreenAskSection: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Section {
+            Toggle(isOn: Binding(get: { model.settings.screenAsk }, set: { v in
+                model.update { $0.screenAsk = v }
+                // The only permission: Screen Recording, asked for when the person turns this on.
+                if v, let ask = model.screenAsk, !ask.screenRecording { ScreenCapture.requestPermission() }
+            })) {
+                Text("Ask about your screen")
+                Text("Hold ⌥⌘ in any app, circle or drag around something, and ask. ⇧⌥⌘ adds another part to the same question. Esc cancels.")
+            }
+            if model.settings.screenAsk, let ask = model.screenAsk {
+                ScreenAskPermissionsView().environment(ask)
+                    .onAppear { ask.refreshPermissions() }
+            }
+        } header: {
+            Text("Screen")
+        } footer: {
+            Text("The picture is taken only while you hold ⌥⌘, and only the part you circle is kept. It stays on this Mac. With this on, Tarn keeps running after you close its window.")
+                .foregroundStyle(.secondary)
+        }
     }
 }

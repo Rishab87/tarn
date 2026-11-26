@@ -13,6 +13,7 @@ Tarn is a native macOS app that makes local AI simple for anyone. When you first
 - **Picks the right AI for your Mac.** It reads your chip and memory and installs the most capable model that still leaves half your RAM free. You choose between *Recommended* and *Lighter*, never a model name. See [docs/MODELS.md](docs/MODELS.md).
 - **Remembers you across chats.** It saves facts you share, like your name or preferences, and can search earlier conversations. Everything stays in a local file you can view and edit in Settings.
 - **Sees images.** Paste, drop or attach screenshots and photos. The vision add-on loads only when a chat has images, so text-only chats use less memory.
+- **Answers questions about your screen.** Hold ⌥⌘ in any app, circle something, and ask. See [Ask about your screen](#ask-about-your-screen).
 - **Looks things up.** Searches the web through DuckDuckGo when it needs current information, and links its sources.
 - **Works in your folders.** Share a folder and it can read, search, write and run commands there. It asks before every change.
 - **Connectors (MCP) and skills.** It talks to local and remote MCP servers, and can import them from Claude Desktop. Skills use the same `SKILL.md` format as Claude.
@@ -20,6 +21,16 @@ Tarn is a native macOS app that makes local AI simple for anyone. When you first
 - **Moves with you.** It backs up chats, memories, skills and connectors to one zip file and restores them on a new Mac.
 - **Updates itself.** Sparkle updates (optional), plus an update check on each launch for the model files.
 - **Counts the water you save.** About 1.1 mL per answer not served from a data center. The method is in [docs/WATER.md](docs/WATER.md).
+
+## Ask about your screen
+
+Hold **⌥⌘** anywhere on your Mac. The screen pauses and glows. Circle or drag around anything (a button, a chart, an error message, a paragraph) and type a question, or press Return to ask "What is this?". The answer appears in a small box beside what you circled.
+
+- **⇧⌥⌘** adds another part of the screen to the same question, for things like "which of these is cheaper?".
+- **Continue in chat** moves the conversation into a normal Tarn chat.
+- **Esc** cancels. If you don't circle anything, the screen comes back by itself after 30 seconds.
+
+Turn it on in Settings → General → Screen. macOS will ask once to let Tarn record the screen; that's how any app sees what's on it. Tarn only takes the picture while you hold ⌥⌘, keeps only the part you circle, and sends it to its own AI on your Mac, nowhere else. It's off until you turn it on, because macOS has to ask that question first. Details: [docs/SCREEN_ASK.md](docs/SCREEN_ASK.md).
 
 ## Requirements
 
@@ -72,7 +83,7 @@ Tarn sends no analytics and has no account. Only these leave your Mac:
 - update checks
 - whatever you approve for connectors you add
 
-Your chats never leave your Mac. Details are in `website/privacy.html`.
+Your chats, and anything you circle with Ask about your screen, never leave your Mac. Details are in `website/privacy.html`.
 
 ## License
 

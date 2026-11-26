@@ -56,6 +56,8 @@ final class AppModel {
     @ObservationIgnored private var allowedInChat: [String: Set<String>] = [:]
     @ObservationIgnored private var memoryQuietUntil = Date.distantPast
     @ObservationIgnored private var saveTimers: [String: Date] = [:]
+    /// Hold ⌥⌘ to ask about the screen (Settings → General). Created at boot.
+    @ObservationIgnored private(set) var screenAsk: ScreenAskController?
 
     static let maxToolRounds = 24
 
@@ -90,11 +92,14 @@ final class AppModel {
         memory.onPressure = { [weak self] critical in self?.handlePressure(critical: critical) }
         memory.start()
         booted = true
+        let ask = ScreenAskController(model: self)
+        screenAsk = ask
+        if settings.onboarded { ask.apply(enabled: settings.screenAsk) }
 
         for c in connectors where c.enabled { connect(c) }
         if settings.onboarded {
             updater.start(autoUpdate: settings.autoUpdate)
-            Task { await checkModelUpdates() }
+            if !Self.offline { Task { await checkModelUpdates() } }
             // Load the model in the background so the first answer doesn't wait for it.
             if activeModelId != nil { Task { try? await ensureEngine() } }
             ensureVisionAddOn()
@@ -115,6 +120,16 @@ final class AppModel {
         if before.theme != settings.theme { applyTheme() }
         if before.autoUpdate != settings.autoUpdate { updater.setAuto(settings.autoUpdate) }
         if before.idleUnloadMinutes != settings.idleUnloadMinutes, case .ready = engineState { Task { try? await ensureEngine() } }
+        if before.screenAsk != settings.screenAsk { screenAsk?.apply(enabled: settings.screenAsk) }
+    }
+
+    /// Debug runs with -TarnOffline YES skip the launch-time model update check (no network).
+    static var offline: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "TarnOffline")
+        #else
+        false
+        #endif
     }
 
     func applyTheme() {
@@ -587,6 +602,21 @@ final class AppModel {
     }
 
     func isAnswering(_ chatId: String?) -> Bool { chatId.map { runs[$0] != nil } ?? false }
+
+    /// Any chat is answering (the screen panel won't restart the engine under it).
+    var anyAnswering: Bool { !runs.isEmpty }
+
+    /// Adds a finished conversation from elsewhere (the screen panel) and opens it.
+    func importChat(_ chat: Chat) {
+        store.save(chat)
+        refreshSummaries()
+        openChat(chat.id)
+    }
+
+    /// One more answer served on this Mac (the water counter).
+    func countAnswer() {
+        update { $0.water.answers += 1; $0.water.ml += Water.mlPerAnswer }
+    }
 
     func approve(_ blockId: String, _ decision: ApprovalDecision) {
         guard let a = approvals.removeValue(forKey: blockId) else { return }
@@ -1123,9 +1153,14 @@ final class AppModel {
             return
         }
         if let mode = d.string(forKey: "TarnDemo") {
-            Task { await runDemo(mode) }
+            if mode == "screen", let ask = screenAsk {
+                Task { await ask.runScreenDemo(model: self, log: { [weak self] in self?.tourLog($0) }, mark: { [weak self] in self?.mark($0) }) }
+            } else {
+                Task { await runDemo(mode) }
+            }
             return
         }
+        if let ask = screenAsk, ask.debugAutomation(log: tourLog) { return }
         guard let text = d.string(forKey: "TarnAutoSend"), settings.onboarded else { return }
         Task {
             try? await Task.sleep(for: .seconds(1))

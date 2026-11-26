@@ -20,13 +20,17 @@
 		24EE8017268DFA7F6C42259B /* libllama-common.0.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 7E9CA8B2927F46BCCFE7BA56 /* libllama-common.0.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		26F1029AAD6385EB49DE3AD5 /* WebTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8220DD4C4F5B7F430F118E /* WebTools.swift */; };
 		2B44598E1D4D9A80BB4D0E1C /* Skills in Resources */ = {isa = PBXBuildFile; fileRef = 9ADBD00AFF8B7D34AA792CE9 /* Skills */; };
+		2C43FB5D874F79DC709DCD20 /* OverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE4B4E71EA6367CF921F22A /* OverlayView.swift */; };
 		3038CA6067CA0628DFF87759 /* Storage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A558329BFF628B22B7D555F5 /* Storage.swift */; };
 		46FBF9AAF784601A63A19489 /* Prompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18CA5715DB94D10CA2174E95 /* Prompt.swift */; };
 		4C4D6D44F96DBA9C184D5372 /* System.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC3E805940EBD44C5F50F4A8 /* System.swift */; };
 		4D3D181A6E6D3ED6D2EB8218 /* MCP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0773AC9886C5E1AF7D6FE5BE /* MCP.swift */; };
 		4D6E8DFEEA0B1C308573C8BB /* libggml-cpu.0.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = F1CF41AC0A111DDA49218A3F /* libggml-cpu.0.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		5E9AA8F51A23B8B465A9C48A /* ChordMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F74CE9BD78BA45EEF8814F16 /* ChordMonitor.swift */; };
 		5F699E854F99760DB67B7A1D /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8286CA08D3312B638D74DC64 /* MainView.swift */; };
 		66DFF49807775D809888CA79 /* Skills.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80E7DC45B8CB281C3F84B8B6 /* Skills.swift */; };
+		7577CE1F2F1D4AD42C9890E3 /* ScreenAskTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F291FD0C80717B607755B34 /* ScreenAskTests.swift */; };
+		7816E4554EECB6324B6CF102 /* ScreenCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB980DCF288EC35B325BBA83 /* ScreenCapture.swift */; };
 		7A7EF5E12F13D24E276F843C /* libggml-rpc.0.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = B6C898566B0856A41ABDCAF6 /* libggml-rpc.0.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		7D396AF67CCDF01A73494E42 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = C1D829993A860A66CAE02AEF /* ZIPFoundation */; };
 		7E0F85484956BEF4F92DA6B6 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AA617D9FBC5C8E427D7F234 /* ChatView.swift */; };
@@ -34,6 +38,7 @@
 		832276F4BF1F93EDCBCE18DD /* libllama-server-impl.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 1A857B3265501C5E4692EEA6 /* libllama-server-impl.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		839C83F7919B6DEA1E4185D0 /* llama-server in CopyFiles */ = {isa = PBXBuildFile; fileRef = 414408E1E1194B510C144284 /* llama-server */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		848398179D1D40920A0CF64E /* libmtmd.0.dylib in CopyFiles */ = {isa = PBXBuildFile; fileRef = 6F706B41019BF6EC84432EBE /* libmtmd.0.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		85724489EF6D8523D0915BBB /* AskPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9B8F2284B941FDDD856110C /* AskPanelView.swift */; };
 		85BEB2E81EA24919A3274B78 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C2CA2940C18B5C15C74D194 /* SettingsView.swift */; };
 		88D52E66765CD17C5D43DB5E /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C089F592A6B602FBDD05BAD /* AppModel.swift */; };
 		A0C88C470207775A0356C2E8 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF5AFD6D96B13351952D34C5 /* Theme.swift */; };
@@ -51,9 +56,11 @@
 		D568AE5C6392F6509594CAC7 /* llama.cpp-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 1094ED2AB695CF32FDAB510F /* llama.cpp-LICENSE.txt */; };
 		DBF95DFE22147467792F159B /* TarnApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CB445F322662A7BE507B107 /* TarnApp.swift */; };
 		DFF5D3B3C64D2B94AA3F0B3F /* Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBF8BC24B9AEDD82BCCC30D7 /* Types.swift */; };
+		E4904FA8BF817D7F0149F89F /* ScreenAsk.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FEA0E0B93F490B64D8E93B /* ScreenAsk.swift */; };
 		E5CF79824A86B2C34930CB30 /* Documents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4A6BF883E67F0391E3A5E0F /* Documents.swift */; };
 		E60742AD2CA04CB7F12D3337 /* TranscriptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23EE181B797485DD9F11012E /* TranscriptView.swift */; };
 		E6A5FED6A518808B7C2B07EF /* ComposerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42525A1128C1A2B3EED84A45 /* ComposerView.swift */; };
+		E6C02DF503AC7239BB8F04B4 /* ScreenAskController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D140052CAF1709E463EAC27 /* ScreenAskController.swift */; };
 		EC88683D4AC5BC0EAC799FC0 /* LLM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 037EBE2822261A00B49EE34E /* LLM.swift */; };
 		F4948B5B66A7992302270176 /* Water.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B32ADD76C98F56254AC0426 /* Water.swift */; };
 /* End PBXBuildFile section */
@@ -100,6 +107,7 @@
 		18CA5715DB94D10CA2174E95 /* Prompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Prompt.swift; sourceTree = "<group>"; };
 		1A857B3265501C5E4692EEA6 /* libllama-server-impl.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = "libllama-server-impl.dylib"; sourceTree = "<group>"; };
 		23EE181B797485DD9F11012E /* TranscriptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptView.swift; sourceTree = "<group>"; };
+		2D140052CAF1709E463EAC27 /* ScreenAskController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenAskController.swift; sourceTree = "<group>"; };
 		322B11C4773621AB48C7C721 /* catalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = catalog.json; sourceTree = "<group>"; };
 		3507629422FBB758556C33EB /* libggml.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = libggml.0.dylib; sourceTree = "<group>"; };
 		414408E1E1194B510C144284 /* llama-server */ = {isa = PBXFileReference; path = "llama-server"; sourceTree = "<group>"; };
@@ -118,28 +126,34 @@
 		8286CA08D3312B638D74DC64 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		8C2CA2940C18B5C15C74D194 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		8DF548AC67FE92F9ED30B7EA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		8F291FD0C80717B607755B34 /* ScreenAskTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenAskTests.swift; sourceTree = "<group>"; };
 		92FFA622BDE1CF3BD1824FD9 /* libllama.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = libllama.0.dylib; sourceTree = "<group>"; };
 		9ADBD00AFF8B7D34AA792CE9 /* Skills */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Skills; path = Tarn/Resources/Skills; sourceTree = SOURCE_ROOT; };
 		9F835F2861AAE00E5736799C /* libggml-metal.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = "libggml-metal.0.dylib"; sourceTree = "<group>"; };
 		A4A6BF883E67F0391E3A5E0F /* Documents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Documents.swift; sourceTree = "<group>"; };
 		A558329BFF628B22B7D555F5 /* Storage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Storage.swift; sourceTree = "<group>"; };
 		ADFEF3C0A0F57DFA4B4D263A /* Downloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Downloader.swift; sourceTree = "<group>"; };
+		B2FEA0E0B93F490B64D8E93B /* ScreenAsk.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenAsk.swift; sourceTree = "<group>"; };
 		B6C898566B0856A41ABDCAF6 /* libggml-rpc.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = "libggml-rpc.0.dylib"; sourceTree = "<group>"; };
 		BA8222CCBF43704D69BB8584 /* TarnTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TarnTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BC3E805940EBD44C5F50F4A8 /* System.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = System.swift; sourceTree = "<group>"; };
+		BEE4B4E71EA6367CF921F22A /* OverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayView.swift; sourceTree = "<group>"; };
 		C38CED4ED88E809AC509ED73 /* Engine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Engine.swift; sourceTree = "<group>"; };
 		C45222AE7FCB2F99432733A5 /* Tarn.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Tarn.entitlements; sourceTree = "<group>"; };
 		C662E7EE5A0CF7178A2608C3 /* Catalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Catalog.swift; sourceTree = "<group>"; };
+		CB980DCF288EC35B325BBA83 /* ScreenCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCapture.swift; sourceTree = "<group>"; };
 		CC594F473B45FD9DE1DBB961 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		CCA39734377624A9522D9D09 /* TarnTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TarnTests.swift; sourceTree = "<group>"; };
 		CE8220DD4C4F5B7F430F118E /* WebTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebTools.swift; sourceTree = "<group>"; };
 		CF5AFD6D96B13351952D34C5 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		D8D04A7808A406D066038A31 /* Memory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Memory.swift; sourceTree = "<group>"; };
+		D9B8F2284B941FDDD856110C /* AskPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskPanelView.swift; sourceTree = "<group>"; };
 		E392F2B6449A128B26063E7B /* Pixel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pixel.swift; sourceTree = "<group>"; };
 		E973F4B3B78706B835E122D8 /* Backup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backup.swift; sourceTree = "<group>"; };
 		EB21C46B3A014368C3CA0FE6 /* WordDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordDocument.swift; sourceTree = "<group>"; };
 		EBF8BC24B9AEDD82BCCC30D7 /* Types.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Types.swift; sourceTree = "<group>"; };
 		F1CF41AC0A111DDA49218A3F /* libggml-cpu.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = "libggml-cpu.0.dylib"; sourceTree = "<group>"; };
+		F74CE9BD78BA45EEF8814F16 /* ChordMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordMonitor.swift; sourceTree = "<group>"; };
 		F848B64D0EAB83DCB279242E /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -198,6 +212,7 @@
 			children = (
 				C662E7EE5A0CF7178A2608C3 /* Catalog.swift */,
 				18CA5715DB94D10CA2174E95 /* Prompt.swift */,
+				B2FEA0E0B93F490B64D8E93B /* ScreenAsk.swift */,
 				EBF8BC24B9AEDD82BCCC30D7 /* Types.swift */,
 				0B32ADD76C98F56254AC0426 /* Water.swift */,
 			);
@@ -223,6 +238,15 @@
 			path = Common;
 			sourceTree = "<group>";
 		};
+		55357E33113995B284D55709 /* ScreenAsk */ = {
+			isa = PBXGroup;
+			children = (
+				D9B8F2284B941FDDD856110C /* AskPanelView.swift */,
+				BEE4B4E71EA6367CF921F22A /* OverlayView.swift */,
+			);
+			path = ScreenAsk;
+			sourceTree = "<group>";
+		};
 		72F9BF50E26B44F447FFB09B /* Settings */ = {
 			isa = PBXGroup;
 			children = (
@@ -245,6 +269,7 @@
 			isa = PBXGroup;
 			children = (
 				4C089F592A6B602FBDD05BAD /* AppModel.swift */,
+				2D140052CAF1709E463EAC27 /* ScreenAskController.swift */,
 				6CB445F322662A7BE507B107 /* TarnApp.swift */,
 			);
 			path = App;
@@ -265,6 +290,7 @@
 				A558329BFF628B22B7D555F5 /* Storage.swift */,
 				BC3E805940EBD44C5F50F4A8 /* System.swift */,
 				EB21C46B3A014368C3CA0FE6 /* WordDocument.swift */,
+				FB493C577068267EDC8DBF68 /* ScreenAsk */,
 				46BBD621FFC3BC85DEFB110F /* Tools */,
 			);
 			path = Services;
@@ -276,6 +302,7 @@
 				15BFDEB846BE264FCA9867D8 /* Chat */,
 				5351D1D7CEF0F6F2AACA600F /* Common */,
 				11245C569C5E4E005127CCB6 /* Onboarding */,
+				55357E33113995B284D55709 /* ScreenAsk */,
 				72F9BF50E26B44F447FFB09B /* Settings */,
 				A0D50C9F498CF3A08F5F39B4 /* Sidebar */,
 			);
@@ -322,6 +349,7 @@
 		CFAF34059D6928CD62FF581E /* TarnTests */ = {
 			isa = PBXGroup;
 			children = (
+				8F291FD0C80717B607755B34 /* ScreenAskTests.swift */,
 				CCA39734377624A9522D9D09 /* TarnTests.swift */,
 			);
 			path = TarnTests;
@@ -338,6 +366,15 @@
 				92E1BC66A8B12BCB92FEB4E2 /* Views */,
 			);
 			path = Tarn;
+			sourceTree = "<group>";
+		};
+		FB493C577068267EDC8DBF68 /* ScreenAsk */ = {
+			isa = PBXGroup;
+			children = (
+				F74CE9BD78BA45EEF8814F16 /* ChordMonitor.swift */,
+				CB980DCF288EC35B325BBA83 /* ScreenCapture.swift */,
+			);
+			path = ScreenAsk;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -447,9 +484,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				88D52E66765CD17C5D43DB5E /* AppModel.swift in Sources */,
+				85724489EF6D8523D0915BBB /* AskPanelView.swift in Sources */,
 				0BD261DC7E63322F6E04EFD2 /* Backup.swift in Sources */,
 				CE7BE853FADE813F14180C75 /* Catalog.swift in Sources */,
 				7E0F85484956BEF4F92DA6B6 /* ChatView.swift in Sources */,
+				5E9AA8F51A23B8B465A9C48A /* ChordMonitor.swift in Sources */,
 				E6A5FED6A518808B7C2B07EF /* ComposerView.swift in Sources */,
 				E5CF79824A86B2C34930CB30 /* Documents.swift in Sources */,
 				079FA16B504A5B7B67332A45 /* Downloader.swift in Sources */,
@@ -461,8 +500,12 @@
 				5F699E854F99760DB67B7A1D /* MainView.swift in Sources */,
 				A19F2B6A47F7545B86CE9CAE /* Memory.swift in Sources */,
 				B3928B457EA47D010CB2C69E /* OnboardingView.swift in Sources */,
+				2C43FB5D874F79DC709DCD20 /* OverlayView.swift in Sources */,
 				82DADDFF94AAD397C8448293 /* Pixel.swift in Sources */,
 				46FBF9AAF784601A63A19489 /* Prompt.swift in Sources */,
+				E4904FA8BF817D7F0149F89F /* ScreenAsk.swift in Sources */,
+				E6C02DF503AC7239BB8F04B4 /* ScreenAskController.swift in Sources */,
+				7816E4554EECB6324B6CF102 /* ScreenCapture.swift in Sources */,
 				85BEB2E81EA24919A3274B78 /* SettingsView.swift in Sources */,
 				66DFF49807775D809888CA79 /* Skills.swift in Sources */,
 				3038CA6067CA0628DFF87759 /* Storage.swift in Sources */,
@@ -482,6 +525,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7577CE1F2F1D4AD42C9890E3 /* ScreenAskTests.swift in Sources */,
 				0EAD6A498E219C5A99C98D0C /* TarnTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -531,7 +575,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -551,7 +595,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.2.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -599,7 +643,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -613,7 +657,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.2.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
