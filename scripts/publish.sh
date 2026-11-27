@@ -71,7 +71,7 @@ curl -fsSL "$FEED" | grep -q "<sparkle:version>$BUILD</sparkle:version>" || die 
 # The site's download buttons point at the newest GitHub release (no bandwidth cap); the copy on
 # the site at /download/Tarn.dmg stays as a fallback for old links.
 WANT=$(shasum -a 256 "$DMG" | cut -d' ' -f1)
-for url in "https://github.com/$REPO/releases/latest/download/Tarn.dmg" https://tarn-ai.vercel.app/download/Tarn.dmg; do
+for url in "https://github.com/$REPO/releases/latest/download/Tarn.dmg" https://www.tarndesk.com/download/Tarn.dmg; do
   [[ $(curl -fsSL "$url" | shasum -a 256 | cut -d' ' -f1) == "$WANT" ]] || die "$url serves a different DMG"
 done
 echo "published $TAG: feed $FEED, GitHub and website downloads match"
